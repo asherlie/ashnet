@@ -43,10 +43,30 @@ void insert_uname(struct an_directory* ad, unsigned char* addr, char* uname){
     last_me->next = create_mac_entry(addr, uname);
 }
 
+void p_directory(struct an_directory* ad){
+    for(int i = 0; i < (int)(sizeof(ad->buckets)/sizeof(struct mac_entry*)); ++i){
+        if(ad->buckets[i]){
+            for(struct mac_entry* me = ad->buckets[i]; me; me = me->next){
+                printf("addr: %.2x:%.2x:%.2x:%.2x:%.2x:%.2x, uname: %s\n", me->addr[0], me->addr[1], me->addr[2],
+                                                                           me->addr[3], me->addr[4], me->addr[5],
+                                                                           me->uname);
+            }
+        }
+    }
+}
+
 int main(){
     struct an_directory ad;
     init_an_directory(&ad);
 
+    insert_uname(&ad, (unsigned char*)"\x08\x90\x11\x00\x00\x01", "asher");
+    insert_uname(&ad, (unsigned char*)"\x98\x90\x35\x00\x00\x01", "eteri");
+    insert_uname(&ad, (unsigned char*)"\xe6\x8d\x35\x00\x00\x01", "maxime");
     insert_uname(&ad, (unsigned char*)"\x00\x00\x00\x00\x00\x01", "christopher");
     insert_uname(&ad, (unsigned char*)"\x00\x00\x00\x00\x01\x00", "oregano");
+    insert_uname(&ad, (unsigned char*)"\x00\x00\x00\x00\x01\x00", "oregano");
+    insert_uname(&ad, (unsigned char*)"\x00\x00\x00\x00\x01\x00", "koritan");
+    insert_uname(&ad, (unsigned char*)"\x00\x00\x00\x00\x01\x00", "koan");
+
+    p_directory(&ad);
 }
