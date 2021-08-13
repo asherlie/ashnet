@@ -16,6 +16,14 @@
 #include "ashnet_dir.h"
 #include "mq.h"
 
+#define ANSI_RED     "\x1b[31m"
+#define ANSI_GREEN   "\x1b[32m"
+#define ANSI_YELLOW  "\x1b[33m"
+#define ANSI_BLUE    "\x1b[34m"
+#define ANSI_MAGENTA "\x1b[35m"
+#define ANSI_CYAN    "\x1b[36m"
+#define ANSI_RESET   "\x1b[0m"
+
 void* repl_th(void* v_mq){
     struct mqueue* mq = v_mq;
     char* ln = NULL;
@@ -53,7 +61,7 @@ void* beacon_th(void* v_ba){
     init_new_beacon_packet(&nbp);
 
     /* TODO: add uname to this packet! */
-    memcpy(nbp.ssid, "UNAME:", 6);
+    memcpy(nbp.ssid, "/UNAME", 6);
     memcpy(nbp.ssid+6, ba->uname, UNAME_LEN);
 
     while(1){
@@ -149,6 +157,30 @@ void p_usage(){
     puts("usage:");
 }
 
+/* TODO: there should be a separate packet handler thread
+ * as of now, main() calls handle_packet() each time a new
+ * packet is read. this will be a bottleneck when many msgs
+ * come in rapidly
+ * messages should be added to a queue and handled by a separate
+ * thread
+ * in order to keep packet reading as fast as possible
+ */
+void handle_packet(struct new_beacon_packet* bp, struct an_directory* ad){
+    switch(*bp->ssid){
+        case '/':
+            if(strstr((char*)bp->ssid+1, "UNAME")){
+                insert_uname(ad, bp->src_addr, (char*)bp->ssid+6);
+            }
+            break;
+        default:
+            printf("%s%s%s: \"%s%s%s\"", ANSI_RED, lookup_uname(ad, bp->src_addr), ANSI_RESET, ANSI_BLUE, bp->ssid, ANSI_RESET);
+            /* TODO: should we print MAC in case of "unknown" */
+            /*printf("%.2x:%.2x:%.2x:%.2x:%.2x:%.2x:\"%s\"\n", bp.src_addr[0], bp.src_addr[1], bp.src_addr[2], */
+                                                 /*bp.src_addr[3], bp.src_addr[4], bp.src_addr[5], bp.ssid);*/
+            break;
+    }
+}
+
 int main(int a, char** b){
     if(a < 2){
         p_usage();
@@ -163,11 +195,13 @@ int main(int a, char** b){
     unsigned char* buffer = malloc(buflen);
     struct new_beacon_packet bp, ref_bp;
 
+    struct an_directory ad;
     struct mqueue mq;
 
     /* this can be on the stack for now */
     struct beacon_arg ba;
 
+    init_an_directory(&ad);
     init_mqueue(&mq);
 
     ba.mq = &mq;
@@ -188,8 +222,7 @@ int main(int a, char** b){
             memcpy(&bp, buffer, sizeof(struct new_beacon_packet));
             /* comparing magic sections to confirm packet is from ashnet */
             if(memcmp(bp.mid_magic, ref_bp.mid_magic, sizeof(bp.mid_magic)))continue;
-            printf("%.2x:%.2x:%.2x:%.2x:%.2x:%.2x:\"%s\"\n", bp.src_addr[0], bp.src_addr[1], bp.src_addr[2], 
-                                                 bp.src_addr[3], bp.src_addr[4], bp.src_addr[5], bp.ssid);
+            handle_packet(&bp, &ad);
         }
         /*if(protocol)*/
         /*if(strstr(buffer+56, "asher"))printf("protocol: %i\n", );*/
