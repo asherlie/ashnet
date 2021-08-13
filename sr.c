@@ -181,7 +181,7 @@ void handle_packet(struct new_beacon_packet* bp, struct an_directory* ad){
             }
             break;
         default:
-            printf("%s%s%s: \"%s%s%s\"", ANSI_RED, lookup_uname(ad, bp->src_addr), ANSI_RESET, ANSI_BLUE, bp->ssid, ANSI_RESET);
+            printf("%s%s%s: \"%s%s%s\"\n", ANSI_RED, lookup_uname(ad, bp->src_addr), ANSI_RESET, ANSI_BLUE, bp->ssid, ANSI_RESET);
             /* TODO: should we print MAC in case of "unknown" */
             /*printf("%.2x:%.2x:%.2x:%.2x:%.2x:%.2x:\"%s\"\n", bp.src_addr[0], bp.src_addr[1], bp.src_addr[2], */
                                                  /*bp.src_addr[3], bp.src_addr[4], bp.src_addr[5], bp.ssid);*/
