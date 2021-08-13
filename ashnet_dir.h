@@ -1,7 +1,5 @@
 #define UNAME_LEN 20
 
-const char unknown[] = "UNKNOWN";
-
 struct mac_entry{
     unsigned char addr[6];
     char uname[UNAME_LEN];

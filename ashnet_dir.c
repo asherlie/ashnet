@@ -49,7 +49,7 @@ char* lookup_uname(struct an_directory* ad, unsigned char* addr){
         if(!memcmp(me->addr, addr, 6))
             return me->uname;
     }
-    return (char*)unknown;
+    return "unknown";
 }
 
 #ifdef TEST
