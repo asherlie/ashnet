@@ -11,11 +11,12 @@ void init_mqueue(struct mqueue* mq){
 }
 
 /*void insert_mqueue(struct mqueue* mq, struct new_beacon_packet* nbp){*/
-void insert_mqueue(struct mqueue* mq, struct new_beacon_packet* nbp, _Bool overwrite_addr){
+void insert_mqueue(struct mqueue* mq, struct new_beacon_packet* nbp, _Bool overwrite_addr, _Bool free_mem){
     struct mq_entry* e = malloc(sizeof(struct mq_entry));
     e->next = NULL;
     e->packet = nbp;
     e->overwrite_addr = overwrite_addr;
+    e->free_mem = free_mem;
 
     pthread_mutex_lock(&mq->lock);
     if(!mq->first){

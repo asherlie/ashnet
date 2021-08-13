@@ -14,6 +14,7 @@ struct mq_entry{
      * a given node
      */
     _Bool overwrite_addr;
+    _Bool free_mem;
 };
 
 struct mqueue{
@@ -24,6 +25,7 @@ struct mqueue{
 
 void init_mqueue(struct mqueue* mq);
 /* if overwrite_addr is not set, nbp's address fields should have already been set */
-void insert_mqueue(struct mqueue* mq, struct new_beacon_packet* nbp, _Bool overwrite_addr);
+//void insert_mqueue(struct mqueue* mq, struct new_beacon_packet* nbp, _Bool overwrite_addr);
+void insert_mqueue(struct mqueue* mq, struct new_beacon_packet* nbp, _Bool overwrite_addr, _Bool free_mem);
 //struct new_beacon_packet* pop_mqueue_blocking(struct mqueue* mq);
 struct mq_entry* pop_mqueue_blocking(struct mqueue* mq);
