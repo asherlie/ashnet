@@ -12,15 +12,36 @@
 
 #include <pthread.h>
 
-#include "packet.h"
+/*#include "packet.h"*/
+#include "ashnet_dir.h"
+#include "mq.h"
+
+/* contaings pointer to mq, uname */
+struct beacon_arg{
+    char uname[UNAME_LEN];
+    struct mqueue* mq;
+};
+
+/* uname alerts should also be spread across the network */
+void* beacon_th(void* v_ba){
+    struct beacon_arg* ba = v_ba;
+
+    struct new_beacon_packet* nbp = malloc(sizeof(struct new_beacon_packet));
+    init_new_beacon_packet(nbp);
+
+    while(1){
+        insert_mqueue(ba->mq, nbp, 1);
+        usleep(1000000);
+    }
+}
 
 /*void prepare_write_sock(int* sock, struct sockaddr_ll* saddr){*/
-void* write_th(void* arg){
-    (void)arg;
+void* write_th(void* v_mq){
+    struct mqueue* mq = v_mq;
     int sock = socket(AF_PACKET, SOCK_RAW, 0);
     struct ifreq ifr = {0};
     struct ifreq if_mac = {0};
-    struct new_beacon_packet nbp;
+    struct new_beacon_packet* nbp;
     int sz = sizeof(struct new_beacon_packet)-4;
     unsigned char macaddr[6];
     unsigned char* buffer;
@@ -48,7 +69,27 @@ void* write_th(void* arg){
      * int sz = sizeof(struct beacon_packet);
     */
 
+    /* setup is now done */
+
+    struct mq_entry* me;
+
+    while(1){
+        me = pop_mqueue_blocking(mq);
+        nbp = me->packet;
+        if(me->overwrite_addr){
+            nbp_set_bssid(nbp, macaddr);
+            nbp_set_src_addr(nbp, macaddr);
+        }
+        buffer = (unsigned char*)nbp;
+        printf("sent %li bytes into the void: \"%s\"\n",
+            sendto(sock, buffer, sz, 0, (struct sockaddr*)&saddr, sizeof(struct sockaddr_ll)), nbp->ssid);
+    }
+
+    return NULL;
+
+#if 0
     init_new_beacon_packet(&nbp);
+
     nbp_set_bssid(&nbp, macaddr);
     nbp_set_src_addr(&nbp, macaddr);
 
@@ -73,6 +114,7 @@ void* write_th(void* arg){
     close(sock);
 
     return NULL;
+#endif
 }
 
 int main(){
@@ -85,8 +127,12 @@ int main(){
     unsigned char* buffer = malloc(buflen);
     struct new_beacon_packet bp, ref_bp;
 
+    struct mqueue mq;
+
+    init_mqueue(&mq);
+
     pthread_t write_pth;
-    pthread_create(&write_pth, NULL, write_th, NULL);
+    pthread_create(&write_pth, NULL, write_th, &mq);
 
     init_new_beacon_packet(&ref_bp);
 
