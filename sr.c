@@ -50,6 +50,10 @@ void* write_th(void* arg){
     init_new_beacon_packet(&nbp);
     nbp_set_bssid(&nbp, (unsigned char*)"\x08\x11\x96\x99\x37\x90");
     nbp_set_src_addr(&nbp, (unsigned char*)"\x08\x11\x96\x99\x37\x90");
+
+    nbp_set_bssid(&nbp, macaddr);
+    nbp_set_src_addr(&nbp, macaddr);
+
     buffer = (unsigned char*)&nbp;
 
     /*saddr.*/
