@@ -52,6 +52,8 @@ char* lookup_uname(struct an_directory* ad, unsigned char* addr){
     return (char*)unknown;
 }
 
+#ifdef TEST
+
 void p_directory(struct an_directory* ad){
     for(int i = 0; i < (int)(sizeof(ad->buckets)/sizeof(struct mac_entry*)); ++i){
         if(ad->buckets[i]){
@@ -83,3 +85,4 @@ int main(){
 
     p_directory(&ad);
 }
+#endif
