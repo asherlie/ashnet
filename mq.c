@@ -27,11 +27,8 @@ void insert_mqueue(struct mqueue* mq, struct new_beacon_packet* nbp){
 struct new_beacon_packet* pop_mqueue(struct mqueue* mq){
     struct new_beacon_packet* ret;
     pthread_mutex_lock(&mq->lock);
-    if(!mq->first)ret = NULL;
-    else{
-        ret = mq->first;
-        mq->first = mq->first->next;
-    }
+    ret = mq->first;
+    if(ret)mq->first = mq->first->next;
     pthread_mutex_unlock(&mq->lock);
     return ret;
 }
