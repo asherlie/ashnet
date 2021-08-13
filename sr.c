@@ -33,7 +33,7 @@ void* repl_th(void* v_mq){
         nbp = malloc(sizeof(struct new_beacon_packet));
         init_new_beacon_packet(nbp);
         memcpy(nbp->ssid, (unsigned char*)ln, llen);
-        insert_mqueue(mq, nbp, 1);
+        insert_mqueue(mq, nbp, 1, 1);
     }
 
     return NULL;
@@ -52,8 +52,10 @@ void* beacon_th(void* v_ba){
     struct new_beacon_packet* nbp = malloc(sizeof(struct new_beacon_packet));
     init_new_beacon_packet(nbp);
 
+    /* TODO: add uname to this packet! */
+
     while(1){
-        insert_mqueue(ba->mq, nbp, 1);
+        insert_mqueue(ba->mq, nbp, 1, 0);
         usleep(1000000);
     }
 }
@@ -106,7 +108,7 @@ void* write_th(void* v_mq){
         buffer = (unsigned char*)nbp;
         printf("sent %li bytes into the void: \"%s\"\n",
             sendto(sock, buffer, sz, 0, (struct sockaddr*)&saddr, sizeof(struct sockaddr_ll)), nbp->ssid);
-        free(nbp); 
+        if(me->free_mem)free(nbp); 
     }
 
     return NULL;
@@ -141,7 +143,15 @@ void* write_th(void* v_mq){
 #endif
 }
 
-int main(){
+void p_usage(){
+    puts("usage:");
+}
+
+int main(int a, char** b){
+    if(a < 2){
+        p_usage();
+        return EXIT_FAILURE;
+    }
     /* TODO: ETH_P_ALL shouldn't be used, we should filter out the noise */
 	struct sockaddr s_addr;
     socklen_t sa_len;
@@ -153,12 +163,19 @@ int main(){
 
     struct mqueue mq;
 
-    pthread_t write_pth, repl_pth;
+    /* this can be on the stack for now */
+    struct beacon_arg ba;
 
     init_mqueue(&mq);
 
+    ba.mq = &mq;
+    strncpy(ba.uname, b[1], UNAME_LEN-1);
+
+    pthread_t write_pth, repl_pth, beacon_pth;
+
     pthread_create(&write_pth, NULL, write_th, &mq);
     pthread_create(&repl_pth, NULL, repl_th, &mq);
+    pthread_create(&beacon_pth, NULL, beacon_th, &ba);
 
     init_new_beacon_packet(&ref_bp);
 
