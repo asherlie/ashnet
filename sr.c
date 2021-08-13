@@ -56,9 +56,9 @@ void* write_th(void* arg){
     size_t lsz;
     int llen;
     while((llen = getline(&ln, &lsz, stdin)) != EOF){
-        if(ln[llen-1] == '\n')ln[--llen] = 0;
+        ln[llen-1] = 0;
         if(llen > 32){
-            ln[32] = 0;
+            ln[31] = 0;
             llen = 32;
         }
         memcpy(nbp.ssid, (unsigned char*)ln, llen);
