@@ -10,6 +10,8 @@
 
 #include <linux/if_packet.h>
 
+#include <pthread.h>
+
 #include "packet.h"
 
 /*void prepare_write_sock(int* sock, struct sockaddr_ll* saddr){*/
@@ -55,6 +57,7 @@ void* write_th(void* arg){
     size_t lsz;
     int llen;
     while((llen = getline(&ln, &lsz, stdin)) != EOF){
+        if(ln[llen-1] == '\n')ln[--llen] = 0;
         if(llen > 32){
             ln[32] = 0;
             llen = 32;
@@ -77,6 +80,9 @@ int main(){
     /* if we're filtering properly, we can keep this buffer small */
     unsigned char* buffer = malloc(100000);
     struct new_beacon_packet bp, ref_bp;
+
+    pthread_t write_pth;
+    pthread_create(&write_pth, NULL, write_th, NULL);
 
     init_new_beacon_packet(&ref_bp);
 
