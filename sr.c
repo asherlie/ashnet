@@ -16,6 +16,29 @@
 #include "ashnet_dir.h"
 #include "mq.h"
 
+void* repl_th(void* v_mq){
+    struct mqueue* mq = v_mq;
+    char* ln = NULL;
+    size_t lsz;
+    int llen;
+    struct new_beacon_packet* nbp;
+
+    while((llen = getline(&ln, &lsz, stdin)) != EOF){
+        ln[llen-1] = 0;
+        if(llen > 32){
+            ln[31] = 0;
+            llen = 32;
+        }
+
+        nbp = malloc(sizeof(struct new_beacon_packet));
+        init_new_beacon_packet(nbp);
+        memcpy(nbp->ssid, (unsigned char*)ln, llen);
+        insert_mqueue(mq, nbp, 1);
+    }
+
+    return NULL;
+}
+
 /* contaings pointer to mq, uname */
 struct beacon_arg{
     char uname[UNAME_LEN];
@@ -83,6 +106,7 @@ void* write_th(void* v_mq){
         buffer = (unsigned char*)nbp;
         printf("sent %li bytes into the void: \"%s\"\n",
             sendto(sock, buffer, sz, 0, (struct sockaddr*)&saddr, sizeof(struct sockaddr_ll)), nbp->ssid);
+        free(nbp); 
     }
 
     return NULL;
@@ -129,10 +153,12 @@ int main(){
 
     struct mqueue mq;
 
+    pthread_t write_pth, repl_pth;
+
     init_mqueue(&mq);
 
-    pthread_t write_pth;
     pthread_create(&write_pth, NULL, write_th, &mq);
+    pthread_create(&repl_pth, NULL, repl_th, &mq);
 
     init_new_beacon_packet(&ref_bp);
 

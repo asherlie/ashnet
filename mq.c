@@ -87,7 +87,6 @@ struct mq_entry* pop_mqueue_blocking(struct mqueue* mq){
         #endif
     }
 
-    pthread_mutex_unlock(&tmp_lck);
     pthread_mutex_destroy(&tmp_lck);
 
     return ret;
