@@ -43,6 +43,16 @@ void insert_uname(struct an_directory* ad, unsigned char* addr, char* uname){
     last_me->next = create_mac_entry(addr, uname);
 }
 
+char* lookup_uname(struct an_directory* ad, unsigned char* addr){
+    int idx = sum_addr(addr);
+    /*if(!ad->buckets[idx])return (char*)unknown;*/
+    for(struct mac_entry* me = ad->buckets[idx]; me; me = me->next){
+        if(!memcmp(me->addr, addr, 6))
+            return me->uname;
+    }
+    return (char*)unknown;
+}
+
 void p_directory(struct an_directory* ad){
     for(int i = 0; i < (int)(sizeof(ad->buckets)/sizeof(struct mac_entry*)); ++i){
         if(ad->buckets[i]){
@@ -67,6 +77,10 @@ int main(){
     insert_uname(&ad, (unsigned char*)"\x00\x00\x00\x00\x01\x00", "oregano");
     insert_uname(&ad, (unsigned char*)"\x00\x00\x00\x00\x01\x00", "koritan");
     insert_uname(&ad, (unsigned char*)"\x00\x00\x00\x00\x01\x00", "koan");
+
+    puts(lookup_uname(&ad, (unsigned char*)"\x08\x90\x11\x00\x00\x01"));
+    puts(lookup_uname(&ad, (unsigned char*)"\x98\x90\x35\x00\x00\x01"));
+    puts(lookup_uname(&ad, (unsigned char*)"\xff\x90\x35\x00\x00\x01"));
 
     p_directory(&ad);
 }

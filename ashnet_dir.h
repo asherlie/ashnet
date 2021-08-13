@@ -1,5 +1,7 @@
 #define UNAME_LEN 20
 
+const char unknown[] = "UNKNOWN";
+
 struct mac_entry{
     unsigned char addr[6];
     char uname[UNAME_LEN];
@@ -12,6 +14,6 @@ struct an_directory{
     struct mac_entry* buckets[1531];
 };
 
-void insert_uname(struct an_directory* ad, unsigned char* addr, char* uname);
-
 void init_an_directory(struct an_directory* ad);
+void insert_uname(struct an_directory* ad, unsigned char* addr, char* uname);
+char* lookup_uname(struct an_directory* ad, unsigned char* addr);
