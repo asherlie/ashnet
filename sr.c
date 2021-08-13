@@ -47,10 +47,8 @@ void* write_th(void* arg){
      * set_src(&pkt, (unsigned char*)"\x08\x11\x96\x99\x37\x90");
      * int sz = sizeof(struct beacon_packet);
     */
-    init_new_beacon_packet(&nbp);
-    nbp_set_bssid(&nbp, (unsigned char*)"\x08\x11\x96\x99\x37\x90");
-    nbp_set_src_addr(&nbp, (unsigned char*)"\x08\x11\x96\x99\x37\x90");
 
+    init_new_beacon_packet(&nbp);
     nbp_set_bssid(&nbp, macaddr);
     nbp_set_src_addr(&nbp, macaddr);
 
