@@ -11,6 +11,7 @@ struct mq_entry{
 struct mqueue{
     struct mq_entry* first, * last;
     pthread_mutex_t lock;
+    pthread_cond_t nonempty;
 };
 
 void init_mqueue(struct mqueue* mq);
