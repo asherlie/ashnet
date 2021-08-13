@@ -49,13 +49,15 @@ struct beacon_arg{
 void* beacon_th(void* v_ba){
     struct beacon_arg* ba = v_ba;
 
-    struct new_beacon_packet* nbp = malloc(sizeof(struct new_beacon_packet));
-    init_new_beacon_packet(nbp);
+    struct new_beacon_packet nbp;
+    init_new_beacon_packet(&nbp);
 
     /* TODO: add uname to this packet! */
+    memcpy(nbp.ssid, "UNAME:", 6);
+    memcpy(nbp.ssid+6, ba->uname, UNAME_LEN);
 
     while(1){
-        insert_mqueue(ba->mq, nbp, 1, 0);
+        insert_mqueue(ba->mq, &nbp, 1, 0);
         usleep(1000000);
     }
 }
