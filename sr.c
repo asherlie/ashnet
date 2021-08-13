@@ -107,6 +107,7 @@ void* write_th(void* v_mq){
     /* setup is now done */
 
     struct mq_entry* me;
+    ssize_t sent;
 
     while(1){
         me = pop_mqueue_blocking(mq);
@@ -116,8 +117,15 @@ void* write_th(void* v_mq){
             nbp_set_src_addr(nbp, macaddr);
         }
         buffer = (unsigned char*)nbp;
-        printf("sent %li bytes into the void: \"%s\"\n",
-            sendto(sock, buffer, sz, 0, (struct sockaddr*)&saddr, sizeof(struct sockaddr_ll)), nbp->ssid);
+        sent = sendto(sock, buffer, sz, 0, (struct sockaddr*)&saddr, sizeof(struct sockaddr_ll));//, nbp->ssid);
+
+        /* bad solution, should probably add another option for mq_entries
+         * that enables system messages to be hidden from the user
+         * instead of just not printing all messages that begin with /
+         */
+        if(*nbp->ssid != '/'){
+            printf("sent %li bytes into the void: \"%s\"\n", sent, nbp->ssid);
+        }
         if(me->free_mem)free(nbp); 
     }
 
