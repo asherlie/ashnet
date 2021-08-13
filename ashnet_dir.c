@@ -45,7 +45,6 @@ void insert_uname(struct an_directory* ad, unsigned char* addr, char* uname){
 
 char* lookup_uname(struct an_directory* ad, unsigned char* addr){
     int idx = sum_addr(addr);
-    /*if(!ad->buckets[idx])return (char*)unknown;*/
     for(struct mac_entry* me = ad->buckets[idx]; me; me = me->next){
         if(!memcmp(me->addr, addr, 6))
             return me->uname;
