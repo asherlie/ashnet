@@ -76,6 +76,7 @@ struct mq_entry* pop_mqueue_blocking(struct mqueue* mq){
         }
         pthread_mutex_unlock(&mq->lock);
         pthread_cond_wait(&mq->nonempty, &tmp_lck);
+        pthread_mutex_unlock(&tmp_lck);
 
         #if 0
         /* we don't need to check for emptiness */
