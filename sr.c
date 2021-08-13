@@ -13,7 +13,8 @@
 #include "packet.h"
 
 /*void prepare_write_sock(int* sock, struct sockaddr_ll* saddr){*/
-void write_th(){
+void* write_th(void* arg){
+    (void)arg;
     int sock = socket(AF_PACKET, SOCK_RAW, 0);
     struct ifreq ifr = {0};
     struct ifreq if_mac = {0};
@@ -63,9 +64,9 @@ void write_th(){
         printf("sent %li bytes into the void: \"%s\"\n",
             sendto(sock, buffer, sz, 0, (struct sockaddr*)&saddr, sizeof(struct sockaddr_ll)), ln);
     }
-    /*printf("send: %li\n", send(stale_sock, buffer, sz, 0));*/
-    perror("send");
     close(sock);
+
+    return NULL;
 }
 
 int main(){
