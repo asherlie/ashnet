@@ -11,11 +11,7 @@ void init_mqueue(struct mqueue* mq){
 void insert_mqueue(struct mqueue* mq, struct new_beacon_packet* nbp){
     struct mq_entry* e = malloc(sizeof(struct mq_entry));
     e->next = NULL;
-    /*memcpy(e->msg, msg, 32);*/
-
-    /* for now, we're not using the same pointer */
-    /* TODO: should i use nbp instead of copying its contents? */
-    memcpy(&e->packet, nbp, sizeof(struct new_beacon_packet));
+    e->packet = nbp;
 
     pthread_mutex_lock(&mq->lock);
     if(!mq->first){
@@ -26,6 +22,18 @@ void insert_mqueue(struct mqueue* mq, struct new_beacon_packet* nbp){
         mq->last = e;
     }
     pthread_mutex_unlock(&mq->lock);
+}
+
+struct new_beacon_packet* pop_mqueue(struct mqueue* mq){
+    struct new_beacon_packet* ret;
+    pthread_mutex_lock(&mq->lock);
+    if(!mq->first)ret = NULL;
+    else{
+        ret = mq->first;
+        mq->first = mq->first->next;
+    }
+    pthread_mutex_unlock(&mq->lock);
+    return ret;
 }
 
 int main(){
