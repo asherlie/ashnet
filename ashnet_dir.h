@@ -1,5 +1,8 @@
+#define UNAME_LEN 20
+
 struct mac_entry{
-    char uname[32];
+    unsigned char addr[6];
+    char uname[UNAME_LEN];
     struct mac_entry* next;
 };
 
