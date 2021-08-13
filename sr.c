@@ -27,7 +27,6 @@ void* write_th(void* arg){
     strncpy(ifr.ifr_name, "wlp3s0", IFNAMSIZ-1);
     strncpy(if_mac.ifr_name, "wlp3s0", IFNAMSIZ-1);
 
-    printf("IOCTL: %i\n", ioctl(sock, SIOCGIFINDEX, &ifr));
     if(ioctl(sock, SIOCGIFINDEX, &ifr) == -1)perror("IOCTL");
     if(ioctl(sock, SIOCGIFHWADDR, &if_mac) < 0)perror("HWADDR");
 
@@ -91,7 +90,8 @@ int main(){
 
         if(packet_len == sizeof(struct new_beacon_packet)){
             memcpy(&bp, buffer, sizeof(struct new_beacon_packet));
-            if(memcmp(bp.magic_hdr, ref_bp.magic_hdr, sizeof(bp.magic_hdr)))break;
+            /* comparing magic sections to confirm packet is from ashnet */
+            if(memcmp(bp.mid_magic, ref_bp.mid_magic, sizeof(bp.mid_magic)))continue;
             printf("\"%s\"\n", bp.ssid);
         }
         /*if(protocol)*/
