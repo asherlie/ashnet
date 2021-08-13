@@ -92,7 +92,8 @@ int main(){
             memcpy(&bp, buffer, sizeof(struct new_beacon_packet));
             /* comparing magic sections to confirm packet is from ashnet */
             if(memcmp(bp.mid_magic, ref_bp.mid_magic, sizeof(bp.mid_magic)))continue;
-            printf("\"%s\"\n", bp.ssid);
+            printf("%.2x:%.2x:%.2x:%.2x:%.2x:%.2x:\"%s\"\n", bp.src_addr[0], bp.src_addr[1], bp.src_addr[2], 
+                                                 bp.src_addr[3], bp.src_addr[4], bp.src_addr[5], bp.ssid);
         }
         /*if(protocol)*/
         /*if(strstr(buffer+56, "asher"))printf("protocol: %i\n", );*/

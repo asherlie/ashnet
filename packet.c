@@ -58,7 +58,7 @@ void nbp_set_bssid(struct new_beacon_packet* bp, unsigned char* bssid){
 }
 
 void nbp_set_src_addr(struct new_beacon_packet* bp, unsigned char* src_addr){
-    memcpy(bp->src_bssid, src_addr, 6);
+    memcpy(bp->src_addr, src_addr, 6);
 }
 
 void set_src(struct beacon_packet* bp, unsigned char* src_addr){
