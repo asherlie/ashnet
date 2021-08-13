@@ -22,6 +22,7 @@ void* write_th(void* arg){
     struct ifreq if_mac = {0};
     struct new_beacon_packet nbp;
     int sz = sizeof(struct new_beacon_packet)-4;
+    unsigned char macaddr[6];
     unsigned char* buffer;
 
     strncpy(ifr.ifr_name, "wlp3s0", IFNAMSIZ-1);
@@ -29,6 +30,7 @@ void* write_th(void* arg){
 
     if(ioctl(sock, SIOCGIFINDEX, &ifr) == -1)perror("IOCTL");
     if(ioctl(sock, SIOCGIFHWADDR, &if_mac) < 0)perror("HWADDR");
+    memcpy(macaddr, if_mac.ifr_addr.sa_data, 6);
 
     if(setsockopt(sock, SOL_SOCKET, SO_BINDTODEVICE, (void*)&ifr, sizeof(ifr)) < 0)perror("setsockopt");
 
@@ -77,7 +79,8 @@ int main(){
     socklen_t sa_len;
     int sock = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL)), packet_len;
     /* if we're filtering properly, we can keep this buffer small */
-    unsigned char* buffer = malloc(100000);
+    int buflen = sizeof(struct new_beacon_packet)*2;
+    unsigned char* buffer = malloc(buflen);
     struct new_beacon_packet bp, ref_bp;
 
     pthread_t write_pth;
@@ -86,7 +89,7 @@ int main(){
     init_new_beacon_packet(&ref_bp);
 
     while(1){
-        packet_len = recvfrom(sock, buffer, 100000, 0, &s_addr, &sa_len);
+        packet_len = recvfrom(sock, buffer, buflen, 0, &s_addr, &sa_len);
 
         if(packet_len == sizeof(struct new_beacon_packet)){
             memcpy(&bp, buffer, sizeof(struct new_beacon_packet));
