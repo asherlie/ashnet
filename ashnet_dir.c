@@ -49,6 +49,9 @@ char* lookup_uname(struct an_directory* ad, unsigned char* addr){
         if(!memcmp(me->addr, addr, 6))
             return me->uname;
     }
+    /* TODO: should we just return NULL in this case?
+     * we could just print the MAC instead of a string
+     */
     return "unknown";
 }
 
