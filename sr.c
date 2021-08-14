@@ -173,12 +173,42 @@ void p_usage(){
  * thread
  * in order to keep packet reading as fast as possible
  */
+#if 0
+i will disable spamming, the spam detection will double as a way to check
+if we have already received a packet
+this might occur if nearby users are `spreading` a packet
+could also RANDOMIZE some field of the packet, possibly timestamp, idk
+play around with what enables the packet to still be sent
+if a packet received is IDENTICAL to any of the last `n` packets
+received by a given MAC, then do nt print it or spread it
+
+does not even have to be exact, we can increase `n` and keep track of broader
+buckets, looking for identical packets
+can just check all packets with the same sum_addr()
+
+ooh and if we are checking for duplicates, then we can just send 2 or 4
+identical packets at a time
+if its received more than once, it will just get filtered out
+increases odds of good transmission, esp. towards upper bounds of range
+
+ALSO
+i should add a preprocessor mode that echoes messages and confirms they were received
+useful for testing range, for example
+
+ALSO
+think about how to implement message builder, could set two bytes x/y - this 
+is message x of a total y
+#endif
+
 void handle_packet(struct new_beacon_packet* bp, struct an_directory* ad){
     switch(*bp->ssid){
         case '/':
             if(strstr((char*)bp->ssid+1, "UNAME")){
                 insert_uname(ad, bp->src_addr, (char*)bp->ssid+6);
             }
+            break;
+        /* [E]cho - useful for testing range */
+        case 'E':
             break;
         default:
             printf("%s%s%s: \"%s%s%s\"\n", ANSI_RED, lookup_uname(ad, bp->src_addr), ANSI_RESET, ANSI_BLUE, bp->ssid, ANSI_RESET);
