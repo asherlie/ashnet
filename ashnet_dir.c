@@ -55,19 +55,18 @@ char* lookup_uname(struct an_directory* ad, unsigned char* addr){
     return "unknown";
 }
 
-#ifdef TEST
-
 void p_directory(struct an_directory* ad){
     for(int i = 0; i < (int)(sizeof(ad->buckets)/sizeof(struct mac_entry*)); ++i){
         if(ad->buckets[i]){
             for(struct mac_entry* me = ad->buckets[i]; me; me = me->next){
-                printf("addr: %.2x:%.2x:%.2x:%.2x:%.2x:%.2x, uname: %s\n", me->addr[0], me->addr[1], me->addr[2],
-                                                                           me->addr[3], me->addr[4], me->addr[5],
-                                                                           me->uname);
+                printf("%s@%.2x:%.2x:%.2x:%.2x:%.2x:%.2x\n",  me->uname, me->addr[0], me->addr[1], me->addr[2],
+                                                                         me->addr[3], me->addr[4], me->addr[5]);
             }
         }
     }
 }
+
+#ifdef TEST
 
 int main(){
     struct an_directory ad;

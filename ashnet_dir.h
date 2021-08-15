@@ -15,3 +15,4 @@ struct an_directory{
 void init_an_directory(struct an_directory* ad);
 void insert_uname(struct an_directory* ad, unsigned char* addr, char* uname);
 char* lookup_uname(struct an_directory* ad, unsigned char* addr);
+void p_directory(struct an_directory* ad);
