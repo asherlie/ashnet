@@ -198,9 +198,17 @@ useful for testing range, for example
 ALSO
 think about how to implement message builder, could set two bytes x/y - this 
 is message x of a total y
+
+it is perhaps simpler to just have m(x of y), but could instead have a recv and request system
+where any node that is already received can fulfill the request
+they request until the message is complete
 #endif
 
-void handle_packet(struct new_beacon_packet* bp, struct an_directory* ad){
+/* handle_packet() returns a packet to send in response
+ * this makes the assumption that there's strictly one
+ * packet to send in response to any given received packet
+ */
+struct new_beacon_packet* handle_packet(struct new_beacon_packet* bp, struct an_directory* ad){
     switch(*bp->ssid){
         case '/':
             if(strstr((char*)bp->ssid+1, "UNAME")){
@@ -217,6 +225,7 @@ void handle_packet(struct new_beacon_packet* bp, struct an_directory* ad){
                                                  /*bp.src_addr[3], bp.src_addr[4], bp.src_addr[5], bp.ssid);*/
             break;
     }
+    return NULL;
 }
 
 int main(int a, char** b){
@@ -231,7 +240,7 @@ int main(int a, char** b){
     /* if we're filtering properly, we can keep this buffer small */
     int buflen = sizeof(struct new_beacon_packet)*2;
     unsigned char* buffer = malloc(buflen);
-    struct new_beacon_packet bp, ref_bp;
+    struct new_beacon_packet bp, ref_bp, * resp_bp;
 
     struct an_directory ad;
     struct mqueue mq;
@@ -260,7 +269,8 @@ int main(int a, char** b){
             memcpy(&bp, buffer, sizeof(struct new_beacon_packet));
             /* comparing magic sections to confirm packet is from ashnet */
             if(memcmp(bp.mid_magic, ref_bp.mid_magic, sizeof(bp.mid_magic)))continue;
-            handle_packet(&bp, &ad);
+            resp_bp = handle_packet(&bp, &ad);
+            if(resp_bp)insert_mqueue(&mq, resp_bp, 0, 1);
         }
         /*if(protocol)*/
         /*if(strstr(buffer+56, "asher"))printf("protocol: %i\n", );*/
