@@ -118,13 +118,16 @@ void* write_th(void* v_mq){
         }
         buffer = (unsigned char*)nbp;
         sent = sendto(sock, buffer, sz, 0, (struct sockaddr*)&saddr, sizeof(struct sockaddr_ll));//, nbp->ssid);
+        /* TODO: verify that sent == sizeof(struct new_beacon_packet)-4 */
+        (void)sent;
 
         /* bad solution, should probably add another option for mq_entries
          * that enables system messages to be hidden from the user
          * instead of just not printing all messages that begin with /
          */
         if(*nbp->ssid != '/'){
-            printf("sent %li bytes into the void: \"%s\"\n", sent, nbp->ssid);
+            printf("%s[YOU]%s: %s%s%s\n", ANSI_GREEN, ANSI_RESET, ANSI_BLUE, nbp->ssid, ANSI_RESET);
+            /*printf("sent %li bytes into the void: \"%s\"\n", sent, nbp->ssid);*/
         }
         if(me->free_mem)free(nbp); 
     }
