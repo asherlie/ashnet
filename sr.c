@@ -226,7 +226,7 @@ struct new_beacon_packet* handle_packet(struct new_beacon_packet* bp, struct an_
              */
             ret = malloc(sizeof(struct new_beacon_packet));
             init_new_beacon_packet(ret);
-            memcpy(ret->ssid, "ECHO", 4);
+            memcpy(ret->ssid, "echo", 4);
             memcpy(ret->ssid+4, bp->ssid, 32-4);
             break;
         default:
