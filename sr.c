@@ -218,6 +218,12 @@ struct new_beacon_packet* handle_packet(struct new_beacon_packet* bp, struct an_
             break;
         /* [E]cho - useful for testing range */
         case 'E':
+            /* as of now, insert_mqueue() handles the setting of send fields
+             * this will cause problems when we need to spread messages
+             * as well as echo,
+             * these fields will need to be moved to the packet itself
+             * see note in mq.c
+             */
             ret = malloc(sizeof(struct new_beacon_packet));
             init_new_beacon_packet(ret);
             memcpy(ret->ssid, "ECHO", 4);
