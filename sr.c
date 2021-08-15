@@ -209,6 +209,7 @@ they request until the message is complete
  * packet to send in response to any given received packet
  */
 struct new_beacon_packet* handle_packet(struct new_beacon_packet* bp, struct an_directory* ad){
+    struct new_beacon_packet* ret = NULL;
     switch(*bp->ssid){
         case '/':
             if(strstr((char*)bp->ssid+1, "UNAME")){
@@ -217,6 +218,10 @@ struct new_beacon_packet* handle_packet(struct new_beacon_packet* bp, struct an_
             break;
         /* [E]cho - useful for testing range */
         case 'E':
+            ret = malloc(sizeof(struct new_beacon_packet));
+            init_new_beacon_packet(ret);
+            memcpy(ret->ssid, "ECHO", 4);
+            memcpy(ret->ssid+4, bp->ssid, 32-4);
             break;
         default:
             printf("%s%s%s: \"%s%s%s\"\n", ANSI_RED, lookup_uname(ad, bp->src_addr), ANSI_RESET, ANSI_BLUE, bp->ssid, ANSI_RESET);
@@ -225,7 +230,7 @@ struct new_beacon_packet* handle_packet(struct new_beacon_packet* bp, struct an_
                                                  /*bp.src_addr[3], bp.src_addr[4], bp.src_addr[5], bp.ssid);*/
             break;
     }
-    return NULL;
+    return ret;
 }
 
 int main(int a, char** b){
