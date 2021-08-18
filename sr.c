@@ -29,6 +29,10 @@ void* repl_th(void* v_mq){
     char* ln = NULL;
     size_t lsz;
     int llen;
+
+    /* the last 4 bytes of the ssid are padded with this to allow repl-sent duplicates */
+    unsigned int variety = 0;
+    int padlen;
     struct new_beacon_packet* nbp;
 
     while((llen = getline(&ln, &lsz, stdin)) != EOF){
@@ -41,8 +45,27 @@ void* repl_th(void* v_mq){
         nbp = malloc(sizeof(struct new_beacon_packet));
         init_new_beacon_packet(nbp);
         memcpy(nbp->ssid, (unsigned char*)ln, llen);
+        /* calculating number of variety bytes we can add to the end of ssid field */
+        padlen = sizeof(int);
+        if(llen+sizeof(int) >= 32)padlen -= (32-llen);
+        memcpy(nbp->ssid+(32-sizeof(int)), &variety, padlen);
+        ++variety;
+
         insert_mqueue(mq, nbp, 1, 1);
+        printf("%s[YOU]%s: %s%s%s\n", ANSI_GREEN, ANSI_RESET, ANSI_BLUE, nbp->ssid, ANSI_RESET);
     }
+    #if 0
+    think about message building - could just use the existing duplicate detection framework
+    and not count messages as received until they get an ENDTRANSMISSION alert
+    then it will attach msgs that came in
+
+    by the way, each message should be sent a couple times anyway
+    this will not get in the way of msg building BECAUSE
+    duplicates are always ignored
+
+    message building will be a bit complex so it will be good to have packet handling occur in a separate thread
+    each time a packet comes in, the nbp can be added to a queue that processes packets one at a time
+    #endif
 
     return NULL;
 }
@@ -128,10 +151,6 @@ void* write_th(void* v_mq){
          * that enables system messages to be hidden from the user
          * instead of just not printing all messages that begin with /
          */
-        if(*nbp->ssid != '/'){
-            printf("%s[YOU]%s: %s%s%s\n", ANSI_GREEN, ANSI_RESET, ANSI_BLUE, nbp->ssid, ANSI_RESET);
-            /*printf("sent %li bytes into the void: \"%s\"\n", sent, nbp->ssid);*/
-        }
         if(me->free_mem)free(nbp); 
     }
 
@@ -219,6 +238,19 @@ they request until the message is complete
 struct new_beacon_packet* handle_packet(struct new_beacon_packet* bp, struct an_directory* ad,
                                         _Bool* overwrite_addr, _Bool* free_mem){
     struct new_beacon_packet* ret = NULL;
+
+    if(is_duplicate_packet(ad, bp))return NULL;
+
+    /* set up return value of identical packet */
+    /* TODO: will final 4 bytes of padding cause problems? 
+     * could ignore these in duplicate detection
+     * these, as well as some other bytes, may be re-computed
+     */
+    ret = malloc(sizeof(struct new_beacon_packet));
+    memcpy(ret, bp, sizeof(struct new_beacon_packet));
+    *overwrite_addr = 0;
+    *free_mem = 1;
+
     switch(*bp->ssid){
         case '/':
             if(strstr((char*)bp->ssid+1, "UNAME")){
@@ -233,20 +265,20 @@ struct new_beacon_packet* handle_packet(struct new_beacon_packet* bp, struct an_
              * these fields will need to be moved to the packet itself
              * see note in mq.c
              */
-            ret = malloc(sizeof(struct new_beacon_packet));
+            init_new_beacon_packet(ret);
             *overwrite_addr = 0;
             *free_mem = 1;
-            init_new_beacon_packet(ret);
             memcpy(ret->ssid, "echo", 4);
             memcpy(ret->ssid+4, bp->ssid, 32-4);
             break;
         default:
-            printf("%s%s%s: \"%s%s%s\"\n", ANSI_RED, lookup_uname(ad, bp->src_addr), ANSI_RESET, ANSI_BLUE, bp->ssid, ANSI_RESET);
+            printf("%s%s%s: \"%s%s%s\"\n", ANSI_RED, lookup_uname(ad, bp->src_addr)->uname, ANSI_RESET, ANSI_BLUE, bp->ssid, ANSI_RESET);
             /* TODO: should we print MAC in case of "unknown" */
             /*printf("%.2x:%.2x:%.2x:%.2x:%.2x:%.2x:\"%s\"\n", bp.src_addr[0], bp.src_addr[1], bp.src_addr[2], */
                                                  /*bp.src_addr[3], bp.src_addr[4], bp.src_addr[5], bp.ssid);*/
             break;
     }
+
     return ret;
 }
 

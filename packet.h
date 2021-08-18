@@ -1,3 +1,5 @@
+#ifndef _PACKET_H
+#define _PACKET_H
 //#include 
 struct beacon_packet{
     unsigned char radiotap_hdr[56];
@@ -39,3 +41,4 @@ void set_src(struct beacon_packet* bp, unsigned char* src_addr);
 
 void nbp_set_bssid(struct new_beacon_packet* bp, unsigned char* bssid);
 void nbp_set_src_addr(struct new_beacon_packet* bp, unsigned char* src_addr);
+#endif
