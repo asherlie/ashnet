@@ -3,8 +3,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-void init_an_directory(struct an_directory* ad){
+void init_an_directory(struct an_directory* ad, int storage){
     memset(ad->buckets, 0, sizeof(ad->buckets));
+    ad->packet_storage = storage;
 }
 
 int sum_addr(unsigned char* addr){
@@ -52,7 +53,15 @@ char* lookup_uname(struct an_directory* ad, unsigned char* addr){
     /* TODO: should we just return NULL in this case?
      * we could just print the MAC instead of a string
      */
-    return "unknown";
+    /* we store this new addr as unknown instead
+     * of simply returning the string literal so that
+     * we can keep track of each message in packet
+     * duplicate checker even in case of reception of
+     * msg packet before uname packet
+     */
+    insert_uname(ad, addr, "unknown");
+    return lookup_uname(ad, addr);
+    /*return "unknown";*/
 }
 
 void p_directory(struct an_directory* ad){

@@ -272,7 +272,7 @@ int main(int a, char** b){
 
     _Bool overwrite_addr, free_mem;
 
-    init_an_directory(&ad);
+    init_an_directory(&ad, 100);
     init_mqueue(&mq);
 
     ba.mq = &mq;
