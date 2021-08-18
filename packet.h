@@ -18,7 +18,10 @@ struct beacon_packet{
 };
 
 /* sizeof(struct new_beacon_packet)-4 should be sent */
-struct new_beacon_packet{
+/* packing is almost certainly unnecessary bc all fields are unsigned
+ * chars, but couldn't hurt
+ */
+struct __attribute__((__packed__)) new_beacon_packet{
     unsigned char magic_hdr[28];
     unsigned char src_addr[6];
     unsigned char src_bssid[6];

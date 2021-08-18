@@ -71,6 +71,9 @@ void* beacon_th(void* v_ba){
 }
 
 /*void prepare_write_sock(int* sock, struct sockaddr_ll* saddr){*/
+/* TODO: split this into prepare_write_sock() and send_packet()
+ * this will simplify the porting process
+ */
 void* write_th(void* v_mq){
     struct mqueue* mq = v_mq;
     int sock = socket(AF_PACKET, SOCK_RAW, 0);
@@ -210,8 +213,11 @@ they request until the message is complete
 /* handle_packet() returns a packet to send in response
  * this makes the assumption that there's strictly one
  * packet to send in response to any given received packet
+ *
+ * overwrite_addr and free_mem are set if ret != NULL
  */
-struct new_beacon_packet* handle_packet(struct new_beacon_packet* bp, struct an_directory* ad){
+struct new_beacon_packet* handle_packet(struct new_beacon_packet* bp, struct an_directory* ad,
+                                        _Bool* overwrite_addr, _Bool* free_mem){
     struct new_beacon_packet* ret = NULL;
     switch(*bp->ssid){
         case '/':
@@ -228,6 +234,8 @@ struct new_beacon_packet* handle_packet(struct new_beacon_packet* bp, struct an_
              * see note in mq.c
              */
             ret = malloc(sizeof(struct new_beacon_packet));
+            *overwrite_addr = 0;
+            *free_mem = 1;
             init_new_beacon_packet(ret);
             memcpy(ret->ssid, "echo", 4);
             memcpy(ret->ssid+4, bp->ssid, 32-4);
@@ -262,6 +270,8 @@ int main(int a, char** b){
     /* this can be on the stack for now */
     struct beacon_arg ba;
 
+    _Bool overwrite_addr, free_mem;
+
     init_an_directory(&ad);
     init_mqueue(&mq);
 
@@ -283,8 +293,8 @@ int main(int a, char** b){
             memcpy(&bp, buffer, sizeof(struct new_beacon_packet));
             /* comparing magic sections to confirm packet is from ashnet */
             if(memcmp(bp.mid_magic, ref_bp.mid_magic, sizeof(bp.mid_magic)))continue;
-            resp_bp = handle_packet(&bp, &ad);
-            if(resp_bp)insert_mqueue(&mq, resp_bp, 0, 1);
+            resp_bp = handle_packet(&bp, &ad, &overwrite_addr, &free_mem);
+            if(resp_bp)insert_mqueue(&mq, resp_bp, overwrite_addr, free_mem);
         }
         /*if(protocol)*/
         /*if(strstr(buffer+56, "asher"))printf("protocol: %i\n", );*/
