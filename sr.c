@@ -26,33 +26,34 @@
 
 void* repl_th(void* v_mq){
     struct mqueue* mq = v_mq;
-    char* ln = NULL;
-    size_t lsz;
-    int llen;
-
+    char c, buf[32] = {0};
     /* the last 4 bytes of the ssid are padded with this to allow repl-sent duplicates */
     unsigned int variety = 0;
-    int padlen;
     struct new_beacon_packet* nbp;
 
-    while((llen = getline(&ln, &lsz, stdin)) != EOF){
-        ln[llen-1] = 0;
-        if(llen > 32){
-            ln[31] = 0;
-            llen = 32;
+    int idx = 0;
+    while((c = getchar()) != EOF){ 
+        
+        if(c != '\n')buf[idx++] = c;
+        /* we send on two conditions:
+         *  if idx == 32
+         *  if c == '\n'
+         */
+        /* chopping off 5 bytes for an int and \0 because we can */
+        if(idx == 27 || c == '\n'){
+            nbp = malloc(sizeof(struct new_beacon_packet));
+            init_new_beacon_packet(nbp);
+            nbp->end_transmission = c == '\n';
+            memcpy(nbp->ssid, buf, idx);
+
+            memcpy(nbp->ssid+(32-sizeof(int)), &variety, sizeof(int));
+            ++variety;
+
+            insert_mqueue(mq, nbp, 1, 1);
+            printf("%s[YOU]%s: %s%s%s\n", ANSI_GREEN, ANSI_RESET, ANSI_BLUE, nbp->ssid, ANSI_RESET);
+
+            idx = 0;
         }
-
-        nbp = malloc(sizeof(struct new_beacon_packet));
-        init_new_beacon_packet(nbp);
-        memcpy(nbp->ssid, (unsigned char*)ln, llen);
-        /* calculating number of variety bytes we can add to the end of ssid field */
-        padlen = sizeof(int);
-        if(llen+sizeof(int) >= 32)padlen -= (32-llen);
-        memcpy(nbp->ssid+(32-sizeof(int)), &variety, padlen);
-        ++variety;
-
-        insert_mqueue(mq, nbp, 1, 1);
-        printf("%s[YOU]%s: %s%s%s\n", ANSI_GREEN, ANSI_RESET, ANSI_BLUE, nbp->ssid, ANSI_RESET);
     }
     #if 0
     think about message building - could just use the existing duplicate detection framework
@@ -216,6 +217,9 @@ void p_usage(){
  * return a malloc'd string
  */
 /*char* build_msg(struct an_directory* ad, unsigned char* addr){*/
+/* TODO: this should be done in a separate thread as to not take
+ * time away from packet reception
+ */
 char* build_msg(struct mac_entry* me){// unsigned char* addr){
     #if 0
     there are two cases:
