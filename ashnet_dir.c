@@ -77,7 +77,11 @@ _Bool is_duplicate_packet(struct an_directory* ad, struct new_beacon_packet* nbp
 
     /*printf("checking %i stored packets\n", me->n_packets);*/
     for(int i = 0; i < me->n_packets; ++i){
-        if(!memcmp(me->nbp+i, nbp, sizeof(struct new_beacon_packet)))return 1;
+        if(!memcmp(me->nbp[i].src_addr, nbp->src_addr, sizeof(nbp->src_addr)) &&
+           !memcmp(me->nbp[i].src_bssid, nbp->src_bssid, sizeof(nbp->src_bssid)) &&
+           !memcmp(me->nbp[i].ssid, nbp->ssid, sizeof(nbp->ssid)) &&
+           me->nbp[i].end_transmission == nbp->end_transmission)
+               return 1;
     }
 
     if(me->pkt_idx == ad->packet_storage)
