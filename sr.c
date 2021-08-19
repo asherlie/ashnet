@@ -143,7 +143,8 @@ void* write_th(void* v_mq){
             nbp_set_src_addr(nbp, macaddr);
         }
         buffer = (unsigned char*)nbp;
-        sent = sendto(sock, buffer, sz, 0, (struct sockaddr*)&saddr, sizeof(struct sockaddr_ll));//, nbp->ssid);
+        for(int i = 0; i < 4; ++i)
+            sent = sendto(sock, buffer, sz, 0, (struct sockaddr*)&saddr, sizeof(struct sockaddr_ll));
         /* TODO: verify that sent == sizeof(struct new_beacon_packet)-4 */
         (void)sent;
 
