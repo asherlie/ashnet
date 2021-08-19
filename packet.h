@@ -24,12 +24,12 @@ struct beacon_packet{
  * chars, but couldn't hurt
  */
 struct __attribute__((__packed__)) new_beacon_packet{
-    unsigned char magic_hdr_head[19];
-    /* true when standalone/final packet of message */
-    _Bool end_transmission;
-    unsigned char magic_hdr_tail[8];
+    unsigned char magic_hdr[28];
     unsigned char src_addr[6];
-    unsigned char src_bssid[6];
+    _Bool end_transmission;
+    _Bool exclude_from_builder;
+    _Bool processed_for_msg;
+    unsigned char extra_space[3];
     /* last byte of this is length of ssid, which is always 32b */
     unsigned char mid_magic[16];
     unsigned char ssid[32];

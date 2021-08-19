@@ -57,16 +57,14 @@ void* repl_th(void* v_mq){
     #if 0
     think about message building - could just use the existing duplicate detection framework
     and not count messages as received until they get an ENDTRANSMISSION alert
-    then it will attach msgs that came in
-
-    by the way, each message should be sent a couple times anyway
-    this will not get in the way of msg building BECAUSE
+    then it will attach msgs that came in by the way, each message should be sent a couple 
+    times anyway this will not get in the way of msg building BECAUSE
     duplicates are always ignored
 
-    message building will be a bit complex so it will be good to have packet handling occur in a separate thread
-    each time a packet comes in, the nbp can be added to a queue that processes packets one at a time
+    message building will be a bit complex so it will be good to have packet handling occur 
+    in a separate thread each time a packet comes in, the nbp can be added to a queue that
+    processes packets one at a time 
     #endif
-
     return NULL;
 }
 
@@ -86,6 +84,7 @@ void* beacon_th(void* v_ba){
     /* TODO: add uname to this packet! */
     memcpy(nbp.ssid, "/UNAME", 6);
     memcpy(nbp.ssid+6, ba->uname, UNAME_LEN);
+    nbp.exclude_from_builder = 1;
 
     while(1){
         insert_mqueue(ba->mq, &nbp, 1, 0);
@@ -139,10 +138,31 @@ void* write_th(void* v_mq){
         me = pop_mqueue_blocking(mq);
         nbp = me->packet;
         if(me->overwrite_addr){
-            nbp_set_bssid(nbp, macaddr);
             nbp_set_src_addr(nbp, macaddr);
         }
         buffer = (unsigned char*)nbp;
+
+        #if 0
+        nbp->end_transmission = 0;
+        strcpy((char*)nbp->ssid, "hey ");
+        sent = sendto(sock, buffer, sz, 0, (struct sockaddr*)&saddr, sizeof(struct sockaddr_ll));
+        sent = sendto(sock, buffer, sz, 0, (struct sockaddr*)&saddr, sizeof(struct sockaddr_ll));
+        strcpy((char*)nbp->ssid, "bro ");
+        sent = sendto(sock, buffer, sz, 0, (struct sockaddr*)&saddr, sizeof(struct sockaddr_ll));
+        sent = sendto(sock, buffer, sz, 0, (struct sockaddr*)&saddr, sizeof(struct sockaddr_ll));
+        strcpy((char*)nbp->ssid, "ur ");
+        sent = sendto(sock, buffer, sz, 0, (struct sockaddr*)&saddr, sizeof(struct sockaddr_ll));
+        sent = sendto(sock, buffer, sz, 0, (struct sockaddr*)&saddr, sizeof(struct sockaddr_ll));
+        nbp->end_transmission = 1;
+        /*nbp->magic_hdr_tail[0] = 0;*/
+        strcpy((char*)nbp->ssid, "cool");
+        sent = sendto(sock, buffer, sz, 0, (struct sockaddr*)&saddr, sizeof(struct sockaddr_ll));
+        sent = sendto(sock, buffer, sz, 0, (struct sockaddr*)&saddr, sizeof(struct sockaddr_ll));
+        sent = sendto(sock, buffer, sz, 0, (struct sockaddr*)&saddr, sizeof(struct sockaddr_ll));
+        sent = sendto(sock, buffer, sz, 0, (struct sockaddr*)&saddr, sizeof(struct sockaddr_ll));
+        sent = sendto(sock, buffer, sz, 0, (struct sockaddr*)&saddr, sizeof(struct sockaddr_ll));
+        #endif
+
         for(int i = 0; i < 4; ++i)
             sent = sendto(sock, buffer, sz, 0, (struct sockaddr*)&saddr, sizeof(struct sockaddr_ll));
         /* TODO: verify that sent == sizeof(struct new_beacon_packet)-4 */
@@ -189,6 +209,35 @@ void* write_th(void* v_mq){
 
 void p_usage(){
     puts("usage:");
+}
+
+/* this function should only be called upon receiving
+ * an end transmission message. it is guaranteed to
+ * return a malloc'd string
+ */
+/*char* build_msg(struct an_directory* ad, unsigned char* addr){*/
+char* build_msg(struct mac_entry* me){// unsigned char* addr){
+    #if 0
+    there are two cases:
+        1: n_packets != ad->packet_storage / n_packets != idx
+        2: else
+
+        when they are equal, things get complicated
+        ignore for now
+        TODO: update
+    #endif
+    /*struct mac_entry* me = lookup_uname(ad, addr);*/
+    /* a strict upper bound for msglen is 32*n_packets */
+    char* ret = calloc(1, 32*me->n_packets);
+
+    for(int i = 0; i < me->n_packets; ++i){
+        if(me->nbp[i].processed_for_msg)continue;
+
+        me->nbp[i].processed_for_msg = 1;
+        strncat(ret, (char*)me->nbp[i].ssid, 32);
+        if(me->nbp[i].end_transmission)break;
+    }
+    return ret;
 }
 
 /* TODO: there should be a separate packet handler thread
@@ -239,6 +288,8 @@ they request until the message is complete
 struct new_beacon_packet* handle_packet(struct new_beacon_packet* bp, struct an_directory* ad,
                                         _Bool* overwrite_addr, _Bool* free_mem){
     struct new_beacon_packet* ret = NULL;
+    struct mac_entry* me;
+    char* msg;
 
     if(is_duplicate_packet(ad, bp))return NULL;
 
@@ -273,10 +324,13 @@ struct new_beacon_packet* handle_packet(struct new_beacon_packet* bp, struct an_
             memcpy(ret->ssid+4, bp->ssid, 32-4);
             break;
         default:
-            printf("%s%s%s: \"%s%s%s\"\n", ANSI_RED, lookup_uname(ad, bp->src_addr)->uname, ANSI_RESET, ANSI_BLUE, bp->ssid, ANSI_RESET);
-            /* TODO: should we print MAC in case of "unknown" */
-            /*printf("%.2x:%.2x:%.2x:%.2x:%.2x:%.2x:\"%s\"\n", bp.src_addr[0], bp.src_addr[1], bp.src_addr[2], */
-                                                 /*bp.src_addr[3], bp.src_addr[4], bp.src_addr[5], bp.ssid);*/
+            if(bp->end_transmission){
+                me = lookup_uname(ad, bp->src_addr);
+                msg = build_msg(me);
+
+                printf("%s%s%s: \"%s%s%s\"\n", ANSI_RED, me->uname, ANSI_RESET, ANSI_BLUE, msg, ANSI_RESET);
+                free(msg);
+            }
             break;
     }
 
@@ -305,7 +359,7 @@ int main(int a, char** b){
 
     _Bool overwrite_addr, free_mem;
 
-    init_an_directory(&ad, 100);
+    init_an_directory(&ad, 1000);
     init_mqueue(&mq);
 
     ba.mq = &mq;

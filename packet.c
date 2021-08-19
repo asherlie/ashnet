@@ -51,10 +51,9 @@ void init_new_beacon_packet(struct new_beacon_packet* bp){
      };
 
      memcpy(bp, packet, sizeof(struct new_beacon_packet));
-}
-
-void nbp_set_bssid(struct new_beacon_packet* bp, unsigned char* bssid){
-    memcpy(bp->src_bssid, bssid, 6);
+     /* defaulting to end_transmission, can be set otherwise in repl() if necessary */
+     bp->end_transmission = 1;
+     bp->exclude_from_builder = 0;
 }
 
 void nbp_set_src_addr(struct new_beacon_packet* bp, unsigned char* src_addr){
