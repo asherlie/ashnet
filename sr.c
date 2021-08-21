@@ -92,6 +92,7 @@ struct beacon_arg{
 /* uname alerts should also be spread across the network */
 void* beacon_th(void* v_ba){
     struct beacon_arg* ba = v_ba;
+    unsigned int variety = 0;
 
     struct new_beacon_packet nbp;
     init_new_beacon_packet(&nbp);
@@ -99,10 +100,12 @@ void* beacon_th(void* v_ba){
     /* TODO: add uname to this packet! */
     memcpy(nbp.ssid, "/UNAME", 6);
     memcpy(nbp.ssid+6, ba->uname, UNAME_LEN);
+    memcpy(nbp.ssid+UNAME_LEN+6, &variety, sizeof(unsigned int));
     nbp.exclude_from_builder = 1;
 
     while(1){
         insert_mqueue(ba->mq, &nbp, 1, 0);
+        ++variety;
         usleep(1000000);
     }
 }
