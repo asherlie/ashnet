@@ -30,6 +30,7 @@ void* repl_th(void* v_mq){
     /* the last 4 bytes of the ssid are padded with this to allow repl-sent duplicates */
     unsigned int variety = 0;
     struct new_beacon_packet* nbp;
+    _Bool new_one = 1;
 
     int idx = 0;
     while((c = getchar()) != EOF){ 
@@ -50,7 +51,20 @@ void* repl_th(void* v_mq){
             ++variety;
 
             insert_mqueue(mq, nbp, 1, 1);
-            printf("%s[YOU]%s: %s%s%s\n", ANSI_GREEN, ANSI_RESET, ANSI_BLUE, nbp->ssid, ANSI_RESET);
+
+            buf[idx] = 0;
+
+            if(new_one){
+                printf("%s[YOU]%s: %s", ANSI_GREEN, ANSI_RESET, ANSI_BLUE);
+                new_one = 0;
+            }
+
+            printf("%s", nbp->ssid);
+
+            if(c == '\n'){
+                printf("%s\n", ANSI_RESET);
+                new_one = 1;
+            }
 
             idx = 0;
         }
