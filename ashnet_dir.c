@@ -6,6 +6,7 @@
 void init_an_directory(struct an_directory* ad, int storage){
     memset(ad->buckets, 0, sizeof(ad->buckets));
     ad->packet_storage = storage;
+    pthread_mutex_init(&ad->lock, NULL);
 }
 
 int sum_addr(unsigned char* addr){
@@ -23,12 +24,10 @@ struct mac_entry* create_mac_entry(unsigned char* addr, char* uname){
     return ret;
 }
 
-/* this does NOT have to be threadsafe as of now - there is only one thread
- * receiving packets
- */
 struct mac_entry* insert_uname(struct an_directory* ad, unsigned char* addr, char* uname){
-    struct mac_entry* last_me;
+    struct mac_entry* last_me, * ret;
     int idx;
+    pthread_mutex_lock(&ad->lock);
     if(!ad->buckets[(idx = sum_addr(addr))]){
         ad->buckets[idx] = create_mac_entry(addr, uname);
         ad->buckets[idx]->nbp = malloc(sizeof(struct new_beacon_packet)*ad->packet_storage);
@@ -38,25 +37,32 @@ struct mac_entry* insert_uname(struct an_directory* ad, unsigned char* addr, cha
          */
         ad->buckets[idx]->n_packets = 0;
         ad->buckets[idx]->pkt_idx = 0;
-        return ad->buckets[idx];
+        last_me = ad->buckets[idx];
+        pthread_mutex_unlock(&ad->lock);
+        return last_me;
     }
     for(struct mac_entry* me = ad->buckets[idx]; me; me = me->next){
         /* in case of updated uname */
         if(!memcmp(me->addr, addr, 6)){
             memcpy(me->uname, uname, UNAME_LEN);
+            pthread_mutex_unlock(&ad->lock);
             return me;
         }
         last_me = me;
     }
-    last_me->next = create_mac_entry(addr, uname);
-    return last_me->next;
+    ret = last_me->next = create_mac_entry(addr, uname);
+    pthread_mutex_unlock(&ad->lock);
+    return ret;
 }
 
 struct mac_entry* lookup_uname(struct an_directory* ad, unsigned char* addr){
     int idx = sum_addr(addr);
+    pthread_mutex_lock(&ad->lock);
     for(struct mac_entry* me = ad->buckets[idx]; me; me = me->next){
-        if(!memcmp(me->addr, addr, 6))
+        if(!memcmp(me->addr, addr, 6)){
+            pthread_mutex_unlock(&ad->lock);
             return me;
+        }
             /*return me->uname;*/
     }
     /* we store this new addr as unknown instead
@@ -65,6 +71,17 @@ struct mac_entry* lookup_uname(struct an_directory* ad, unsigned char* addr){
      * duplicate checker even in case of reception of
      * msg packet before uname packet
      */
+    /* THIS isn't entirely threadsafe
+     * another thread could potentially add an entry
+     * and then have it overwritten before insert_uname()
+     * acquires a lock
+     * TODO: insert_uname() should have an option to be run
+     * with a lock already acquired
+     * it can still unlock the lock, which would allow
+     * keeping the line:
+     *  return insert_uname(ad, addr, "unknown");
+     */
+    pthread_mutex_unlock(&ad->lock);
     return insert_uname(ad, addr, "unknown");
 }
 
@@ -74,14 +91,19 @@ struct mac_entry* lookup_uname(struct an_directory* ad, unsigned char* addr){
  */
 _Bool is_duplicate_packet(struct an_directory* ad, struct new_beacon_packet* nbp){
     struct mac_entry* me = lookup_uname(ad, nbp->src_addr);
+    int lock_idx = sum_addr(nbp->src_addr) % 50;
+
+    pthread_mutex_lock(&ad->packet_storage_locks[lock_idx]);
 
     /*printf("checking %i stored packets\n", me->n_packets);*/
     for(int i = 0; i < me->n_packets; ++i){
         if(!memcmp(me->nbp[i].src_addr, nbp->src_addr, sizeof(nbp->src_addr)) &&
            !memcmp(me->nbp[i].ssid, nbp->ssid, sizeof(nbp->ssid)) &&
            me->nbp[i].end_transmission == nbp->end_transmission && 
-           me->nbp[i].exclude_from_builder == nbp->exclude_from_builder)
+           me->nbp[i].exclude_from_builder == nbp->exclude_from_builder){
+               pthread_mutex_unlock(&ad->packet_storage_locks[lock_idx]);
                return 1;
+           }
     }
 
     if(me->pkt_idx == ad->packet_storage)
@@ -90,6 +112,8 @@ _Bool is_duplicate_packet(struct an_directory* ad, struct new_beacon_packet* nbp
     me->nbp[me->pkt_idx++].processed_for_msg = nbp->exclude_from_builder;
 
     if(me->n_packets != ad->packet_storage)++me->n_packets;
+
+    pthread_mutex_unlock(&ad->packet_storage_locks[lock_idx]);
 
     return 0;
 }

@@ -110,12 +110,18 @@ void* beacon_th(void* v_ba){
     }
 }
 
+struct write_arg{
+    struct mqueue* mq;
+    struct an_directory* ad;
+};
+
 /*void prepare_write_sock(int* sock, struct sockaddr_ll* saddr){*/
 /* TODO: split this into prepare_write_sock() and send_packet()
  * this will simplify the porting process
  */
-void* write_th(void* v_mq){
-    struct mqueue* mq = v_mq;
+void* write_th(void* v_wa){
+    struct write_arg* wa = v_wa;
+    struct mqueue* mq = wa->mq;
     int sock = socket(AF_PACKET, SOCK_RAW, 0);
     struct ifreq ifr = {0};
     struct ifreq if_mac = {0};
@@ -150,41 +156,31 @@ void* write_th(void* v_mq){
     /* setup is now done */
 
     struct mq_entry* me;
-    ssize_t sent;
+    ssize_t sent = 0;
 
     while(1){
         me = pop_mqueue_blocking(mq);
         nbp = me->packet;
+
         if(me->overwrite_addr){
             nbp_set_src_addr(nbp, macaddr);
         }
+
+        /* not necessary to check return value,
+         * should never be a duplicate
+         * TODO: should i use a more precise approach?
+         * this is possibly inefficient
+         */
+        (void)is_duplicate_packet(wa->ad, nbp);
+
         buffer = (unsigned char*)nbp;
 
-        #if 0
-        nbp->end_transmission = 0;
-        strcpy((char*)nbp->ssid, "hey ");
-        sent = sendto(sock, buffer, sz, 0, (struct sockaddr*)&saddr, sizeof(struct sockaddr_ll));
-        sent = sendto(sock, buffer, sz, 0, (struct sockaddr*)&saddr, sizeof(struct sockaddr_ll));
-        strcpy((char*)nbp->ssid, "bro ");
-        sent = sendto(sock, buffer, sz, 0, (struct sockaddr*)&saddr, sizeof(struct sockaddr_ll));
-        sent = sendto(sock, buffer, sz, 0, (struct sockaddr*)&saddr, sizeof(struct sockaddr_ll));
-        strcpy((char*)nbp->ssid, "ur ");
-        sent = sendto(sock, buffer, sz, 0, (struct sockaddr*)&saddr, sizeof(struct sockaddr_ll));
-        sent = sendto(sock, buffer, sz, 0, (struct sockaddr*)&saddr, sizeof(struct sockaddr_ll));
-        nbp->end_transmission = 1;
-        /*nbp->magic_hdr_tail[0] = 0;*/
-        strcpy((char*)nbp->ssid, "cool");
-        sent = sendto(sock, buffer, sz, 0, (struct sockaddr*)&saddr, sizeof(struct sockaddr_ll));
-        sent = sendto(sock, buffer, sz, 0, (struct sockaddr*)&saddr, sizeof(struct sockaddr_ll));
-        sent = sendto(sock, buffer, sz, 0, (struct sockaddr*)&saddr, sizeof(struct sockaddr_ll));
-        sent = sendto(sock, buffer, sz, 0, (struct sockaddr*)&saddr, sizeof(struct sockaddr_ll));
-        sent = sendto(sock, buffer, sz, 0, (struct sockaddr*)&saddr, sizeof(struct sockaddr_ll));
-        #endif
 
         for(int i = 0; i < 4; ++i)
-            sent = sendto(sock, buffer, sz, 0, (struct sockaddr*)&saddr, sizeof(struct sockaddr_ll));
+            sent += sendto(sock, buffer, sz, 0, (struct sockaddr*)&saddr, sizeof(struct sockaddr_ll));
+
         /* TODO: verify that sent == sizeof(struct new_beacon_packet)-4 */
-        (void)sent;
+        sent = 0;
 
         /* bad solution, should probably add another option for mq_entries
          * that enables system messages to be hidden from the user
@@ -377,6 +373,7 @@ int main(int a, char** b){
 
     /* this can be on the stack for now */
     struct beacon_arg ba;
+    struct write_arg wa;
 
     _Bool overwrite_addr, free_mem;
 
@@ -386,9 +383,12 @@ int main(int a, char** b){
     ba.mq = &mq;
     strncpy(ba.uname, b[1], UNAME_LEN-1);
 
+    wa.mq = &mq;
+    wa.ad = &ad;
+
     pthread_t write_pth, repl_pth, beacon_pth;
 
-    pthread_create(&write_pth, NULL, write_th, &mq);
+    pthread_create(&write_pth, NULL, write_th, &wa);
     pthread_create(&repl_pth, NULL, repl_th, &mq);
     pthread_create(&beacon_pth, NULL, beacon_th, &ba);
 
@@ -397,7 +397,10 @@ int main(int a, char** b){
     while(1){
         packet_len = recvfrom(sock, buffer, buflen, 0, &s_addr, &sa_len);
 
-        if(packet_len == sizeof(struct new_beacon_packet)){
+        /* 4 magic bytes are sometimes magically appended to our packets :shrug:
+         * make sense of this later
+         */
+        if(packet_len == sizeof(struct new_beacon_packet) || packet_len == sizeof(struct new_beacon_packet)-4){
             memcpy(&bp, buffer, sizeof(struct new_beacon_packet));
             /* comparing magic sections to confirm packet is from ashnet */
             if(memcmp(bp.mid_magic, ref_bp.mid_magic, sizeof(bp.mid_magic)))continue;

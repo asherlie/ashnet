@@ -1,3 +1,5 @@
+#include <pthread.h>
+
 #include "packet.h"
 
 #define UNAME_LEN 20
@@ -13,6 +15,13 @@ struct mac_entry{
 
 /* stores mac address, uname pairs */
 struct an_directory{
+    pthread_mutex_t lock;
+
+    /* instead of having one for each MAC, 
+     * we use 50 and just do some modulus
+     * on sum_addr() to select which lock to use
+     */
+    pthread_mutex_t packet_storage_locks[50];
     int packet_storage;
     /* (0xff * 6) + 1 */
     struct mac_entry* buckets[1531];
