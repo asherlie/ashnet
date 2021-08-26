@@ -354,16 +354,41 @@ struct new_beacon_packet* handle_packet(struct new_beacon_packet* bp, struct an_
     return ret;
 }
 
+inline int min(int a, int b){
+    if(a < b)return a;
+    return b;
+}
+
 /* packets are viable if they fit our size constraints AND
  * they are either a /UNAME message or contain a known address
  *
  * uname messages must have the string /UNAME and have their src_addr field be
  * identical to their BSSID field
  */
+/* TODO:
+ * as messages come in, known offsets should be stored
+ * the expensive iteration should only occur if no viable message is found
+ * using existing stored buffer offsets
+ *
+ * TODO: this approach could lead to issues if the address of another user
+ * randomly appears in a message - rare but could certainly occur
+ */
 _Bool is_viable_packet(struct an_directory* ad, unsigned char* buffer, struct new_beacon_packet* nbp, int len){
-    (void)ad; (void)buffer; (void)nbp;
+    /* bounds i've experimentally found */
     if(len < 92 || len > 100)return 0;
-    return 1;
+
+    for(int i = 0; i < len; ++i){
+        memcpy(nbp->src_addr, buffer+i, min(len-i, sizeof(struct new_beacon_packet)));
+        if(is_known_address(ad, nbp->src_addr))return 1;
+        if(*nbp->ssid == '/' && strstr((char*)nbp->ssid+1, "UNAME") && !memcmp(nbp->src_addr, &nbp->end_transmission, 6)){
+            /* since UNAME packets must now have identical BSSID and src_addr, we need to prep for handling */
+            /* TODO: COULD also simply insert_uname() here to simplify */
+            nbp->end_transmission = 1;
+            nbp->exclude_from_builder = 1;
+            return 1;
+        }
+    }
+    return 0;
 }
 
 int main(int a, char** b){
