@@ -354,6 +354,18 @@ struct new_beacon_packet* handle_packet(struct new_beacon_packet* bp, struct an_
     return ret;
 }
 
+/* packets are viable if they fit our size constraints AND
+ * they are either a /UNAME message or contain a known address
+ *
+ * uname messages must have the string /UNAME and have their src_addr field be
+ * identical to their BSSID field
+ */
+_Bool is_viable_packet(struct an_directory* ad, unsigned char* buffer, struct new_beacon_packet* nbp, int len){
+    (void)ad; (void)buffer; (void)nbp;
+    if(len < 92 || len > 100)return 0;
+    return 1;
+}
+
 int main(int a, char** b){
     if(a < 2){
         p_usage();
@@ -400,7 +412,8 @@ int main(int a, char** b){
         /* 4 magic bytes are sometimes magically appended to our packets :shrug:
          * make sense of this later
          */
-        if(packet_len == sizeof(struct new_beacon_packet) || packet_len == sizeof(struct new_beacon_packet)-4){
+        if(is_viable_packet(&ad, buffer, &bp, packet_len)){
+        // if(packet_len == sizeof(struct new_beacon_packet) || packet_len == sizeof(struct new_beacon_packet)-4){
             memcpy(&bp, buffer, sizeof(struct new_beacon_packet));
             /* comparing magic sections to confirm packet is from ashnet */
             if(memcmp(bp.mid_magic, ref_bp.mid_magic, sizeof(bp.mid_magic)))continue;
