@@ -29,6 +29,7 @@ struct an_directory{
 
 void init_an_directory(struct an_directory* ad, int storage);
 struct mac_entry* insert_uname(struct an_directory* ad, unsigned char* addr, char* uname);
+_Bool is_known_address(struct an_directory* ad, unsigned char* addr);
 struct mac_entry* lookup_uname(struct an_directory* ad, unsigned char* addr);
 _Bool is_duplicate_packet(struct an_directory* ad, struct new_beacon_packet* nbp);
 void p_directory(struct an_directory* ad);

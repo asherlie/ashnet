@@ -55,6 +55,20 @@ struct mac_entry* insert_uname(struct an_directory* ad, unsigned char* addr, cha
     return ret;
 }
 
+_Bool is_known_address(struct an_directory* ad, unsigned char* addr){
+    int idx = sum_addr(addr);
+    pthread_mutex_lock(&ad->lock);
+    for(struct mac_entry* me = ad->buckets[idx]; me; me = me->next){
+        if(!memcmp(me->addr, addr, 6)){
+            pthread_mutex_unlock(&ad->lock);
+            return 1;
+        }
+            /*return me->uname;*/
+    }
+    pthread_mutex_unlock(&ad->lock);
+    return 0;
+}
+
 struct mac_entry* lookup_uname(struct an_directory* ad, unsigned char* addr){
     int idx = sum_addr(addr);
     pthread_mutex_lock(&ad->lock);
