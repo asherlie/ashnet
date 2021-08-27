@@ -100,7 +100,15 @@ void* beacon_th(void* v_ba){
     /* TODO: add uname to this packet! */
     memcpy(nbp.ssid, "/UNAME", 6);
     memcpy(nbp.ssid+6, ba->uname, UNAME_LEN);
-    nbp.exclude_from_builder = 1;
+    // this is now handled by the receiving node - this space is ovewritten
+    // with the second identical address field in order to confirm structure
+    // of packet
+    //nbp.exclude_from_builder = 1;
+    /* this field is used in the pre-sending phase. this informs nbp_set_src_addr() to 
+     * copy local address to BSSID field, which happens to be occupied by the boolean
+     * flags as well as the extra space region of nbp
+     */
+    *nbp.extra_space = 1;
 
     while(1){
         memcpy(nbp.ssid+UNAME_LEN+6, &variety, sizeof(unsigned int));
@@ -432,6 +440,7 @@ int main(int a, char** b){
     init_new_beacon_packet(&ref_bp);
 
     while(1){
+        sa_len = sizeof(struct sockaddr);
         packet_len = recvfrom(sock, buffer, buflen, 0, &s_addr, &sa_len);
 
         /* 4 magic bytes are sometimes magically appended to our packets :shrug:
@@ -439,7 +448,7 @@ int main(int a, char** b){
          */
         if(is_viable_packet(&ad, buffer, &bp, packet_len)){
         // if(packet_len == sizeof(struct new_beacon_packet) || packet_len == sizeof(struct new_beacon_packet)-4){
-            memcpy(&bp, buffer, sizeof(struct new_beacon_packet));
+            // memcpy(&bp, buffer, sizeof(struct new_beacon_packet));
             /* comparing magic sections to confirm packet is from ashnet */
             if(memcmp(bp.mid_magic, ref_bp.mid_magic, sizeof(bp.mid_magic)))continue;
             resp_bp = handle_packet(&bp, &ad, &overwrite_addr, &free_mem);
