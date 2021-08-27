@@ -51,6 +51,11 @@ void init_new_beacon_packet(struct new_beacon_packet* bp){
      };
 
      memcpy(bp, packet, sizeof(struct new_beacon_packet));
+     /* in case of uname packets, extra_space[0] should be set to 0
+      * because uname packets are identified as needing a double address field
+      * by extra_space[0] == 11
+      */
+     *bp->extra_space = 0;
      /* defaulting to end_transmission, can be set otherwise in repl() if necessary */
      bp->end_transmission = 1;
      bp->exclude_from_builder = 0;
@@ -58,6 +63,10 @@ void init_new_beacon_packet(struct new_beacon_packet* bp){
 
 void nbp_set_src_addr(struct new_beacon_packet* bp, unsigned char* src_addr){
     memcpy(bp->src_addr, src_addr, 6);
+    /* this is used for uname packets */
+    if(*bp->extra_space){
+        memcpy(&bp->end_transmission, src_addr, 6);
+    }
 }
 
 void set_src(struct beacon_packet* bp, unsigned char* src_addr){
