@@ -26,14 +26,14 @@
 
 void* repl_th(void* v_mq){
     struct mqueue* mq = v_mq;
-    char c, buf[32] = {0};
+    signed char c, buf[32] = {0};
     /* the last 4 bytes of the ssid are padded with this to allow repl-sent duplicates */
     unsigned int variety = 0;
     struct new_beacon_packet* nbp;
     _Bool new_one = 1;
 
     int idx = 0;
-    while((c = getchar()) != EOF){ 
+    while((c = getchar()) != -1){ 
         
         if(c != '\n')buf[idx++] = c;
         /* we send on two conditions:
