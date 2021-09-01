@@ -488,7 +488,10 @@ int main(int a, char** b){
     _Bool overwrite_addr, free_mem;
 
     init_an_directory(&ad, 1000);
+
     init_mqueue(&write_mq);
+    init_mqueue(&pre_handler_mq);
+    init_mqueue(&crafted_packet_mq);
 
     ba.mq = &write_mq;
     strncpy(ba.uname, b[1], UNAME_LEN-1);
@@ -515,6 +518,7 @@ int main(int a, char** b){
         // if(packet_len == sizeof(struct new_beacon_packet) || packet_len == sizeof(struct new_beacon_packet)-4){
             // memcpy(&bp, buffer, sizeof(struct new_beacon_packet));
             /* comparing magic sections to confirm packet is from ashnet */
+            add this to is_viable_packet()
             if(memcmp(bp.mid_magic, ref_bp.mid_magic, sizeof(bp.mid_magic)))continue;
             resp_bp = handle_packet(&bp, &ad, &overwrite_addr, &free_mem);
             if(resp_bp)insert_mqueue(&write_mq, resp_bp, overwrite_addr, free_mem);
