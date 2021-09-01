@@ -24,6 +24,8 @@
 #define ANSI_CYAN    "\x1b[36m"
 #define ANSI_RESET   "\x1b[0m"
 
+#define N_PRE_HANDLER_THREADS 10
+
 void* repl_th(void* v_mq){
     struct mqueue* mq = v_mq;
     signed char c, buf[32] = {0};
@@ -504,11 +506,18 @@ int main(int a, char** b){
     wa.mq = &write_mq;
     wa.ad = &ad;
 
-    pthread_t write_pth, repl_pth, beacon_pth;
+    pthread_t write_pth, repl_pth, beacon_pth, pre_handler_pth[N_PRE_HANDLER_THREADS], handler_pth;
+
+    struct handler_arg ha = {.ad = &ad, .write_mq = &write_mq, .raw_mq = &pre_handler_mq, .cooked_mq = &crafted_packet_mq};
 
     pthread_create(&write_pth, NULL, write_th, &wa);
     pthread_create(&repl_pth, NULL, repl_th, &write_mq);
     pthread_create(&beacon_pth, NULL, beacon_th, &ba);
+
+    for(int i = 0; i < N_PRE_HANDLER_THREADS; ++i){
+        pthread_create(pre_handler_pth+i, NULL, pre_handler_th, &ha);
+    }
+    pthread_create(&handler_pth, NULL, handler_th, &ha);
 
     init_new_beacon_packet(&ref_bp);
 
