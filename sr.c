@@ -429,6 +429,10 @@ void* pre_handler_th(void* v_ha){
         me = pop_mqueue_blocking(ha->raw_mq);
         nbp = malloc(sizeof(struct new_beacon_packet));
         /* at this point, me->packet is just an unsigned char* cast to nbp */
+        /*len must be passed in a diff way - needs to be part of the mq/nbp*/
+        /* 4 magic bytes are sometimes magically appended to our packets :shrug:
+         * make sense of this later
+         */
         if(is_viable_packet(ha->ad, (unsigned char*)me->packet, nbp, ha->len) && 
            (!memcmp(nbp->mid_magic, ref_nbp.mid_magic, sizeof(nbp->mid_magic)))){
 
@@ -472,7 +476,6 @@ int main(int a, char** b){
     /* if we're filtering properly, we can keep this buffer small */
     int buflen = sizeof(struct new_beacon_packet)*2;
     unsigned char* buffer = malloc(buflen);
-    struct new_beacon_packet bp, ref_bp, * resp_bp;
 
     struct an_directory ad;
     /* write_mq is used to buffer messages and
@@ -491,8 +494,6 @@ int main(int a, char** b){
     /* this can be on the stack for now */
     struct beacon_arg ba;
     struct write_arg wa;
-
-    _Bool overwrite_addr, free_mem;
 
     init_an_directory(&ad, 1000);
 
@@ -517,26 +518,15 @@ int main(int a, char** b){
     for(int i = 0; i < N_PRE_HANDLER_THREADS; ++i){
         pthread_create(pre_handler_pth+i, NULL, pre_handler_th, &ha);
     }
-    pthread_create(&handler_pth, NULL, handler_th, &ha);
 
-    init_new_beacon_packet(&ref_bp);
+    pthread_create(&handler_pth, NULL, handler_th, &ha);
 
     while(1){
         sa_len = sizeof(struct sockaddr);
         packet_len = recvfrom(sock, buffer, buflen, 0, &s_addr, &sa_len);
 
-        /* 4 magic bytes are sometimes magically appended to our packets :shrug:
-         * make sense of this later
-         */
-        if(is_viable_packet(&ad, buffer, &bp, packet_len)){
-        // if(packet_len == sizeof(struct new_beacon_packet) || packet_len == sizeof(struct new_beacon_packet)-4){
-            // memcpy(&bp, buffer, sizeof(struct new_beacon_packet));
-            /* comparing magic sections to confirm packet is from ashnet */
-            resp_bp = handle_packet(&bp, &ad, &overwrite_addr, &free_mem);
-            if(resp_bp)insert_mqueue(&write_mq, resp_bp, overwrite_addr, free_mem);
-        }
-        /*if(protocol)*/
-        /*if(strstr(buffer+56, "asher"))printf("protocol: %i\n", );*/
+        /* boolean flags are irrelevant in this case */
+        insert_mqueue(&pre_handler_mq, (struct new_beacon_packet*)buffer, 0, 1);
     }
 
 }
