@@ -414,7 +414,20 @@ int main(int a, char** b){
     struct new_beacon_packet bp, ref_bp, * resp_bp;
 
     struct an_directory ad;
-    struct mqueue mq;
+    /* write_mq is used to buffer messages and
+     * is popped by write_th, which then sends the
+     * popped nbp
+     *
+     * pre_handler_mq is used to buffer raw data
+     * that has been received - it checks if data
+     * are viable to craft packets, if so the crafted
+     *
+     * packet is added to a final queue - crafted_packet_mq
+     * which is popped by a handle_packet() thread
+     */
+    struct mqueue write_mq, pre_handler_mq, crafted_packet_mq;
+    (void)pre_handler_mq;
+    (void)crafted_packet_mq;
 
     /* this can be on the stack for now */
     struct beacon_arg ba;
@@ -423,18 +436,18 @@ int main(int a, char** b){
     _Bool overwrite_addr, free_mem;
 
     init_an_directory(&ad, 1000);
-    init_mqueue(&mq);
+    init_mqueue(&write_mq);
 
-    ba.mq = &mq;
+    ba.mq = &write_mq;
     strncpy(ba.uname, b[1], UNAME_LEN-1);
 
-    wa.mq = &mq;
+    wa.mq = &write_mq;
     wa.ad = &ad;
 
     pthread_t write_pth, repl_pth, beacon_pth;
 
     pthread_create(&write_pth, NULL, write_th, &wa);
-    pthread_create(&repl_pth, NULL, repl_th, &mq);
+    pthread_create(&repl_pth, NULL, repl_th, &write_mq);
     pthread_create(&beacon_pth, NULL, beacon_th, &ba);
 
     init_new_beacon_packet(&ref_bp);
@@ -452,7 +465,7 @@ int main(int a, char** b){
             /* comparing magic sections to confirm packet is from ashnet */
             if(memcmp(bp.mid_magic, ref_bp.mid_magic, sizeof(bp.mid_magic)))continue;
             resp_bp = handle_packet(&bp, &ad, &overwrite_addr, &free_mem);
-            if(resp_bp)insert_mqueue(&mq, resp_bp, overwrite_addr, free_mem);
+            if(resp_bp)insert_mqueue(&write_mq, resp_bp, overwrite_addr, free_mem);
         }
         /*if(protocol)*/
         /*if(strstr(buffer+56, "asher"))printf("protocol: %i\n", );*/
