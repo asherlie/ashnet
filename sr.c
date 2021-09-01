@@ -399,6 +399,60 @@ _Bool is_viable_packet(struct an_directory* ad, unsigned char* buffer, struct ne
     return 0;
 }
 
+/* this struct is used for both pre_handler_th() and handler_th()
+ *
+ * in pre_handler_th(), the write_mq field is not used
+ *
+ * in handler_th(), the raw_mq and len fields are not used
+ */
+struct handler_arg{
+    struct an_directory* ad;
+    struct mqueue* write_mq, * raw_mq, * cooked_mq;
+    int len;
+};
+
+/* > 1 of these will be running simultaneously - this code
+ * checks if a packet is viable and adds it to cooked_mq
+ * to be handled if it is
+ */
+void* pre_handler_th(void* v_ha){
+    struct handler_arg* ha = v_ha;
+
+    struct mq_entry* me;
+    struct new_beacon_packet* nbp;
+
+    while(1){
+        me = pop_mqueue_blocking(ha->raw_mq);
+        nbp = malloc(sizeof(struct new_beacon_packet));
+        /* at this point, me->packet is just an unsigned char* cast to nbp */
+        if(is_viable_packet(ha->ad, (unsigned char*)me->packet, nbp, ha->len))
+            insert_mqueue(ha->cooked_mq, nbp, 0, 1);
+    }
+
+    return NULL;
+}
+
+/* 
+ * this thread handles properly formatted packets and
+ * inserts their return value to the write_mq to be sent
+ */
+void* handler_th(void* v_ha){
+    struct handler_arg* ha = v_ha;
+    /*struct mqueue* cooked_mq = v_cooked_mq;*/
+    struct mq_entry* me;
+    struct new_beacon_packet* hret = NULL;
+    _Bool overwrite_addr, free_mem;
+
+    while(1){
+        me = pop_mqueue_blocking(ha->cooked_mq);
+        if((hret = handle_packet(me->packet, ha->ad, &overwrite_addr, &free_mem))){
+            insert_mqueue(ha->write_mq, hret, overwrite_addr, free_mem);
+        }
+    }
+
+    return NULL;
+}
+
 int main(int a, char** b){
     if(a < 2){
         p_usage();
@@ -426,8 +480,6 @@ int main(int a, char** b){
      * which is popped by a handle_packet() thread
      */
     struct mqueue write_mq, pre_handler_mq, crafted_packet_mq;
-    (void)pre_handler_mq;
-    (void)crafted_packet_mq;
 
     /* this can be on the stack for now */
     struct beacon_arg ba;
