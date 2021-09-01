@@ -419,14 +419,19 @@ void* pre_handler_th(void* v_ha){
     struct handler_arg* ha = v_ha;
 
     struct mq_entry* me;
-    struct new_beacon_packet* nbp;
+    struct new_beacon_packet* nbp, ref_nbp;
+
+    init_new_beacon_packet(&ref_nbp);
 
     while(1){
         me = pop_mqueue_blocking(ha->raw_mq);
         nbp = malloc(sizeof(struct new_beacon_packet));
         /* at this point, me->packet is just an unsigned char* cast to nbp */
-        if(is_viable_packet(ha->ad, (unsigned char*)me->packet, nbp, ha->len))
-            insert_mqueue(ha->cooked_mq, nbp, 0, 1);
+        if(is_viable_packet(ha->ad, (unsigned char*)me->packet, nbp, ha->len) && 
+           (!memcmp(nbp->mid_magic, ref_nbp.mid_magic, sizeof(nbp->mid_magic)))){
+
+               insert_mqueue(ha->cooked_mq, nbp, 0, 1);
+        }
     }
 
     return NULL;
@@ -518,8 +523,6 @@ int main(int a, char** b){
         // if(packet_len == sizeof(struct new_beacon_packet) || packet_len == sizeof(struct new_beacon_packet)-4){
             // memcpy(&bp, buffer, sizeof(struct new_beacon_packet));
             /* comparing magic sections to confirm packet is from ashnet */
-            add this to is_viable_packet()
-            if(memcmp(bp.mid_magic, ref_bp.mid_magic, sizeof(bp.mid_magic)))continue;
             resp_bp = handle_packet(&bp, &ad, &overwrite_addr, &free_mem);
             if(resp_bp)insert_mqueue(&write_mq, resp_bp, overwrite_addr, free_mem);
         }
