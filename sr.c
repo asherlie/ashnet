@@ -385,7 +385,7 @@ inline int min(int a, int b){
  */
 _Bool is_viable_packet(struct an_directory* ad, unsigned char* buffer, struct new_beacon_packet* nbp, int len){
     /* bounds i've experimentally found */
-    if(len < 92 || len > 100)return 0;
+    if(len < 92 || len > 120)return 0;
 
     for(int i = 0; i < len; ++i){
         memcpy(nbp->src_addr, buffer+i, min(len-i, sizeof(struct new_beacon_packet)));
@@ -410,7 +410,6 @@ _Bool is_viable_packet(struct an_directory* ad, unsigned char* buffer, struct ne
 struct handler_arg{
     struct an_directory* ad;
     struct mqueue* write_mq, * raw_mq, * cooked_mq;
-    int len;
 };
 
 /* > 1 of these will be running simultaneously - this code
@@ -433,7 +432,15 @@ void* pre_handler_th(void* v_ha){
         /* 4 magic bytes are sometimes magically appended to our packets :shrug:
          * make sense of this later
          */
-        if(is_viable_packet(ha->ad, (unsigned char*)me->packet, nbp, ha->len) && 
+        /* the first byte of our buffer is used to store the length of the raw packet
+         * this is safe because is_viable_packet() checks viability by copying the buffer
+         * into an nbp from different offsets, testing regions at each offset
+         * the first byte is only used in the first iteration, in which case its ignored
+         * anyway as magic_hdr[0]
+         * it's okay that we're limited to one byte because our upper bound for packet length
+         * is 120 bytes and we can fit 0xff
+         */
+        if(is_viable_packet(ha->ad, (unsigned char*)me->packet, nbp, (int)(*((unsigned char*)me->packet))) && 
            (!memcmp(nbp->mid_magic, ref_nbp.mid_magic, sizeof(nbp->mid_magic)))){
 
                insert_mqueue(ha->cooked_mq, nbp, 0, 1);
@@ -524,6 +531,8 @@ int main(int a, char** b){
     while(1){
         sa_len = sizeof(struct sockaddr);
         packet_len = recvfrom(sock, buffer, buflen, 0, &s_addr, &sa_len);
+        /* truncating to an unsigned char, safe, as explained by pre_handler_th() */
+        *buffer = (unsigned char)packet_len;
 
         /* boolean flags are irrelevant in this case */
         insert_mqueue(&pre_handler_mq, (struct new_beacon_packet*)buffer, 0, 1);
