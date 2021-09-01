@@ -360,6 +360,8 @@ struct new_beacon_packet* handle_packet(struct new_beacon_packet* bp, struct an_
             }
             break;
     }
+    /* since all packets are malloc'd, we must free them here */
+    free(bp);
 
     return ret;
 }
@@ -388,7 +390,8 @@ _Bool is_viable_packet(struct an_directory* ad, unsigned char* buffer, struct ne
     if(len < 92 || len > 120)return 0;
 
     for(int i = 0; i < len; ++i){
-        memcpy(nbp->src_addr, buffer+i, min(len-i, sizeof(struct new_beacon_packet)));
+        /* we shouldn't memcpy the entire size of an nbp because we're copying from after magic_hdr */
+        memcpy(nbp->src_addr, buffer+i, min(len-i, sizeof(struct new_beacon_packet)-(sizeof(nbp->magic_hdr))));
         if(is_known_address(ad, nbp->src_addr))return 1;
         if(*nbp->ssid == '/' && strstr((char*)nbp->ssid+1, "UNAME") && !memcmp(nbp->src_addr, &nbp->end_transmission, 6)){
             /* since UNAME packets must now have identical BSSID and src_addr, we need to prep for handling */
@@ -445,6 +448,8 @@ void* pre_handler_th(void* v_ha){
 
                insert_mqueue(ha->cooked_mq, nbp, 0, 1);
         }
+        /* if packet isn't viable, free up the mem */
+        free(me->packet);
     }
 
     return NULL;
@@ -482,7 +487,7 @@ int main(int a, char** b){
     int sock = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL)), packet_len;
     /* if we're filtering properly, we can keep this buffer small */
     int buflen = sizeof(struct new_beacon_packet)*2;
-    unsigned char* buffer = malloc(buflen);
+    unsigned char* buffer;
 
     struct an_directory ad;
     /* write_mq is used to buffer messages and
@@ -529,6 +534,7 @@ int main(int a, char** b){
     pthread_create(&handler_pth, NULL, handler_th, &ha);
 
     while(1){
+        buffer = malloc(buflen);
         sa_len = sizeof(struct sockaddr);
         packet_len = recvfrom(sock, buffer, buflen, 0, &s_addr, &sa_len);
         /* truncating to an unsigned char, safe, as explained by pre_handler_th() */
