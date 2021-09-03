@@ -24,7 +24,8 @@
 #define ANSI_CYAN    "\x1b[36m"
 #define ANSI_RESET   "\x1b[0m"
 
-#define N_PRE_HANDLER_THREADS 10
+#define N_PRE_HANDLER_THREADS 20
+#define N_HANDLER_THREADS 15
 
 void* repl_th(void* v_mq){
     struct mqueue* mq = v_mq;
@@ -186,8 +187,14 @@ void* write_th(void* v_wa){
         buffer = (unsigned char*)nbp;
 
 
-        for(int i = 0; i < 4; ++i)
+        for(int i = 0; i < 4; ++i){
+            /*
+             * this may be improper - saddr is meant to be the dest - look at man sendto()
+             * to find out info about broadcasting and using SO_BROADCAST on sock too maybe hmm
+            */
             sent += sendto(sock, buffer, sz, 0, (struct sockaddr*)&saddr, sizeof(struct sockaddr_ll));
+            sent = 0;
+        }
 
         /* TODO: verify that sent == sizeof(struct new_beacon_packet)-4 */
         sent = 0;
@@ -387,7 +394,7 @@ inline int min(int a, int b){
  */
 _Bool is_viable_packet(struct an_directory* ad, unsigned char* buffer, struct new_beacon_packet* nbp, int len){
     /* bounds i've experimentally found */
-    if(len < 92 || len > 120)return 0;
+    if(len < 80 || len > 180)return 0;
 
     for(int i = 0; i < len; ++i){
         /* we shouldn't memcpy the entire size of an nbp because we're copying from after magic_hdr */
@@ -519,7 +526,7 @@ int main(int a, char** b){
     wa.mq = &write_mq;
     wa.ad = &ad;
 
-    pthread_t write_pth, repl_pth, beacon_pth, pre_handler_pth[N_PRE_HANDLER_THREADS], handler_pth;
+    pthread_t write_pth, repl_pth, beacon_pth, pre_handler_pth[N_PRE_HANDLER_THREADS], handler_pth[N_HANDLER_THREADS];
 
     struct handler_arg ha = {.ad = &ad, .write_mq = &write_mq, .raw_mq = &pre_handler_mq, .cooked_mq = &crafted_packet_mq};
 
@@ -527,11 +534,15 @@ int main(int a, char** b){
     pthread_create(&repl_pth, NULL, repl_th, &write_mq);
     pthread_create(&beacon_pth, NULL, beacon_th, &ba);
 
+    /* spawning pre_handler and handler threads */
     for(int i = 0; i < N_PRE_HANDLER_THREADS; ++i){
         pthread_create(pre_handler_pth+i, NULL, pre_handler_th, &ha);
     }
 
-    pthread_create(&handler_pth, NULL, handler_th, &ha);
+    for(int i = 0; i < N_HANDLER_THREADS; ++i){
+        pthread_create(handler_pth+i, NULL, pre_handler_th, &ha);
+    }
+
 
     while(1){
         buffer = malloc(buflen);
