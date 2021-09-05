@@ -2,11 +2,13 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdatomic.h>
 
 void init_an_directory(struct an_directory* ad, int storage){
     memset(ad->buckets, 0, sizeof(ad->buckets));
     ad->packet_storage = storage;
     pthread_mutex_init(&ad->lock, NULL);
+    ad->vpl_idx = 0;
 }
 
 int sum_addr(unsigned char* addr){
@@ -143,6 +145,11 @@ void p_directory(struct an_directory* ad){
     }
 }
 
+void add_viable_plen(struct an_directory* ad, int len){
+    int reserved = atomic_fetch_add(&ad->vpl_idx, 1);
+    ad->viable_packet_len[reserved] = len;
+}
+
 #ifdef TEST
 /*test this new functionality, lookup uname, then search for it - should be unknonw, then insert, then search*/
 int main(){
@@ -186,4 +193,5 @@ int main(){
 
     p_directory(&ad);
 }
+
 #endif
