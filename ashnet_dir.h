@@ -33,8 +33,6 @@ struct an_directory{
      * all indices will be initialized to -1, an impossible value
      */
     _Atomic int viable_packet_len[1000];
-    /* this is atomic to ensure we've reserved a space for insertion */
-    _Atomic int vpl_idx;
 };
 
 void init_an_directory(struct an_directory* ad, int storage);
@@ -44,5 +42,5 @@ struct mac_entry* lookup_uname(struct an_directory* ad, unsigned char* addr);
 _Bool is_duplicate_packet(struct an_directory* ad, struct new_beacon_packet* nbp);
 void p_directory(struct an_directory* ad);
 
-void add_viable_plen(struct an_directory* ad, int len);
-_Bool is_viable_plen(struct an_directory* ad, int len);
+void add_viable_plen(struct an_directory* ad, int len, int offset);
+int is_viable_plen(struct an_directory* ad, int len);
