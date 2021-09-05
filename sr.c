@@ -25,7 +25,7 @@
 #define ANSI_RESET   "\x1b[0m"
 
 #define N_PRE_HANDLER_THREADS 20
-#define N_HANDLER_THREADS 15
+#define N_HANDLER_THREADS 5 
 
 void* repl_th(void* v_mq){
     struct mqueue* mq = v_mq;
@@ -392,6 +392,20 @@ inline int min(int a, int b){
  * TODO: this approach could lead to issues if the address of another user
  * randomly appears in a message - rare but could certainly occur
  */
+#if 0
+new technique - keep a list of possible sizes
+this will be kept in the struct ha that is passed to the only thread that checks packet viability
+this list is updated ONLY upon reception of a uname message
+we'll check each byte for a /uname until buf+(len-(32+4)) or len-(sizeof(ssid)+sizeof(end_magic))
+once we find the /uname, we've located the start of an ssid field and can memcpy from there
+
+we should move the mid magic checks into here by adding a param for ideal_mid_magic
+
+then, once packet is confirmed viable, add its len to the viable msg length
+
+if packet comes in that has a known length, memcpy into nbp and check if we know its address
+#endif
+
 _Bool is_viable_packet(struct an_directory* ad, unsigned char* buffer, struct new_beacon_packet* nbp, int len){
     /* bounds i've experimentally found */
     if(len < 80 || len > 180)return 0;
@@ -456,7 +470,7 @@ void* pre_handler_th(void* v_ha){
                insert_mqueue(ha->cooked_mq, nbp, 0, 1);
         }
         /* if packet isn't viable, free up the mem */
-        free(me->packet);
+        else free(me->packet);
     }
 
     return NULL;
