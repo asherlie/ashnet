@@ -396,8 +396,8 @@ inline int min(int a, int b){
 new technique - keep a list of possible sizes
 this will be kept in the struct ha that is passed to the only thread that checks packet viability
 this list is updated ONLY upon reception of a uname message
-we'll check each byte for a /uname until buf+(len-(32+4)) or len-(sizeof(ssid)+sizeof(end_magic))
-once we find the /uname, we've located the start of an ssid field and can memcpy from there
+we will check each byte for a /uname until buf+(len-(32+4)) or len-(sizeof(ssid)+sizeof(end_magic))
+once we find the /uname, we have located the start of an ssid field and can memcpy from there
 
 we should move the mid magic checks into here by adding a param for ideal_mid_magic
 
@@ -408,7 +408,29 @@ if packet comes in that has a known length, memcpy into nbp and check if we know
 
 _Bool is_viable_packet(struct an_directory* ad, unsigned char* buffer, struct new_beacon_packet* nbp, int len){
     /* bounds i've experimentally found */
-    if(len < 80 || len > 180)return 0;
+    /*printf("len: %i, ret == %i\n", len, (len == 88 || len == 92 || len == 101 || len == 83));*/
+    /*return (len == 88 || len == 92 || len == 101 || len == 83);*/
+    /*if(!(len == 88 || len == 92 || len == 101 || len == 83))return 0;*/
+    /*ad = len->vpl_idx;*/
+    /*ad->viable_packet_len[*/
+    /*if(len != 92)return 0;*/
+    /*if(len < 80 || len > 180)return 0;*/
+    int offset;
+    if((offset = is_viable_plen(ad, len)) != -1){
+        memcpy(nbp->src_addr, buffer+offset, min(len-offset, sizeof(struct new_beacon_packet)-sizeof(nbp->magic_hdr)));
+        if(is_known_address(ad, nbp->src_addr))return 1;
+        /* handling unames of known size separately to avoid iterating byte by byte */
+        if(strstr((char*)nbp->ssid, "/UNAME") == (char*)nbp->ssid)return 1;
+        /* is packet is of known length but is not from a known user and is not a uname beacon,
+         * ignore
+         */
+        return 0;
+    }
+
+    /* checking for /uname somewhere in our packet
+     * if found, we add this packet length/offset pair
+     * to our viable_packet_len storage
+     */
 
     for(int i = 0; i < len; ++i){
         /* we shouldn't memcpy the entire size of an nbp because we're copying from after magic_hdr */
@@ -467,6 +489,7 @@ void* pre_handler_th(void* v_ha){
         if(is_viable_packet(ha->ad, (unsigned char*)me->packet, nbp, (int)(*((unsigned char*)me->packet))) && 
            (!memcmp(nbp->mid_magic, ref_nbp.mid_magic, sizeof(nbp->mid_magic)))){
 
+               printf("viable len: %i\n", (int)(*((unsigned char*)me->packet)));
                insert_mqueue(ha->cooked_mq, nbp, 0, 1);
         }
         /* if packet isn't viable, free up the mem */
