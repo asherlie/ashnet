@@ -540,7 +540,7 @@ int main(int a, char** b){
     }
 
     for(int i = 0; i < N_HANDLER_THREADS; ++i){
-        pthread_create(handler_pth+i, NULL, pre_handler_th, &ha);
+        pthread_create(handler_pth+i, NULL, handler_th, &ha);
     }
 
 
