@@ -151,6 +151,16 @@ void add_viable_plen(struct an_directory* ad, int len){
     atomic_store(ad->viable_packet_len+reserved, len);
 }
 
+_Bool is_viable_plen(struct an_directory* ad, int len){
+    int n_plens = atomic_load(&ad->vpl_idx);
+    for(int i = 0; i < n_plens; ++i){
+        if(ad->viable_packet_len[i] == len){
+            return 1;
+        }
+    }
+    return 0;
+}
+
 #ifdef TEST
 /*test this new functionality, lookup uname, then search for it - should be unknonw, then insert, then search*/
 int main(){
