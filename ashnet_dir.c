@@ -9,7 +9,6 @@ void init_an_directory(struct an_directory* ad, int storage){
     ad->packet_storage = storage;
     pthread_mutex_init(&ad->lock, NULL);
     memset(ad->viable_packet_len, -1, sizeof(ad->viable_packet_len));
-    ad->vpl_idx = 0;
 }
 
 int sum_addr(unsigned char* addr){
@@ -146,19 +145,14 @@ void p_directory(struct an_directory* ad){
     }
 }
 
-void add_viable_plen(struct an_directory* ad, int len){
-    int reserved = atomic_fetch_add(&ad->vpl_idx, 1);
-    atomic_store(ad->viable_packet_len+reserved, len);
+void add_viable_plen(struct an_directory* ad, int len, int offset){
+    atomic_store(ad->viable_packet_len+len, offset);
 }
 
-_Bool is_viable_plen(struct an_directory* ad, int len){
-    int n_plens = atomic_load(&ad->vpl_idx);
-    for(int i = 0; i < n_plens; ++i){
-        if(ad->viable_packet_len[i] == len){
-            return 1;
-        }
-    }
-    return 0;
+/* returns offset of src_addr, if viable - otherwise, -1 */
+int is_viable_plen(struct an_directory* ad, int len){
+    int ret = atomic_load(ad->viable_packet_len+len);
+    return ret;
 }
 
 #ifdef TEST
