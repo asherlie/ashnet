@@ -8,6 +8,7 @@ void init_an_directory(struct an_directory* ad, int storage){
     memset(ad->buckets, 0, sizeof(ad->buckets));
     ad->packet_storage = storage;
     pthread_mutex_init(&ad->lock, NULL);
+    memset(ad->viable_packet_len, -1, sizeof(ad->viable_packet_len));
     ad->vpl_idx = 0;
 }
 
@@ -147,7 +148,7 @@ void p_directory(struct an_directory* ad){
 
 void add_viable_plen(struct an_directory* ad, int len){
     int reserved = atomic_fetch_add(&ad->vpl_idx, 1);
-    ad->viable_packet_len[reserved] = len;
+    atomic_store(ad->viable_packet_len+reserved, len);
 }
 
 #ifdef TEST

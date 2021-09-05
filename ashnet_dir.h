@@ -27,11 +27,13 @@ struct an_directory{
     struct mac_entry* buckets[1531];
 
     /* TODO: this should be dynamically resized */
-    int viable_packet_len[1000];
-
-    /* only idx needs to be _Atomic, as incrementing it will make space
-     * in the current idx for insertion
+    /* this is atomic to ensure that if we're checking for valid length
+     * there's no chance of a false positive due to being midway through
+     * an insertion
+     * all indices will be initialized to -1, an impossible value
      */
+    _Atomic int viable_packet_len[1000];
+    /* this is atomic to ensure we've reserved a space for insertion */
     _Atomic int vpl_idx;
 };
 
