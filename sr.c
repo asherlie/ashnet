@@ -417,6 +417,7 @@ _Bool is_viable_packet(struct an_directory* ad, unsigned char* buffer, struct ne
     /*if(len < 80 || len > 180)return 0;*/
     int offset;
     if((offset = is_viable_plen(ad, len)) != -1){
+        /* we shouldn't memcpy the entire size of an nbp because we're copying from after magic_hdr */
         memcpy(nbp->src_addr, buffer+offset, min(len-offset, sizeof(struct new_beacon_packet)-sizeof(nbp->magic_hdr)));
         if(is_known_address(ad, nbp->src_addr))return 1;
         /* handling unames of known size separately to avoid iterating byte by byte */
@@ -431,12 +432,17 @@ _Bool is_viable_packet(struct an_directory* ad, unsigned char* buffer, struct ne
      * if found, we add this packet length/offset pair
      * to our viable_packet_len storage
      */
-
     for(int i = 0; i < len; ++i){
-        /* we shouldn't memcpy the entire size of an nbp because we're copying from after magic_hdr */
-        memcpy(nbp->src_addr, buffer+i, min(len-i, sizeof(struct new_beacon_packet)-(sizeof(nbp->magic_hdr))));
-        if(is_known_address(ad, nbp->src_addr))return 1;
-        if(*nbp->ssid == '/' && strstr((char*)nbp->ssid+1, "UNAME") && !memcmp(nbp->src_addr, &nbp->end_transmission, 6)){
+        if(!memcmp(buffer+i, "/UNAME", 6)){
+            /*
+             * we have ssid, need to find src_addr
+             * these are a fixed dist apart
+            */
+            offset = i-(nbp->ssid-nbp->src_addr);
+            add_viable_plen(ad, len, offset);
+            /* TODO: fix this function to not repeat any code */
+            /* we shouldn't memcpy the entire size of an nbp because we're copying from after magic_hdr */
+            memcpy(nbp->src_addr, buffer+offset, min(len-offset, sizeof(struct new_beacon_packet)-sizeof(nbp->magic_hdr)));
             /* since UNAME packets must now have identical BSSID and src_addr, we need to prep for handling */
             /* TODO: COULD also simply insert_uname() here to simplify */
             nbp->end_transmission = 1;
@@ -489,7 +495,6 @@ void* pre_handler_th(void* v_ha){
         if(is_viable_packet(ha->ad, (unsigned char*)me->packet, nbp, (int)(*((unsigned char*)me->packet))) && 
            (!memcmp(nbp->mid_magic, ref_nbp.mid_magic, sizeof(nbp->mid_magic)))){
 
-               printf("viable len: %i\n", (int)(*((unsigned char*)me->packet)));
                insert_mqueue(ha->cooked_mq, nbp, 0, 1);
         }
         /* if packet isn't viable, free up the mem */
