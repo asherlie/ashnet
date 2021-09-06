@@ -24,8 +24,17 @@
 #define ANSI_CYAN    "\x1b[36m"
 #define ANSI_RESET   "\x1b[0m"
 
-#define N_PRE_HANDLER_THREADS 20
-#define N_HANDLER_THREADS 5 
+/* OMG - depending on the number of pre-handler threads,
+ * duplicate plen offset pairs are being stored for our sent messages
+ * are messages being pre-handled multiple times?
+ *
+ * IMPORTANT:
+ *  does pop_mqueue_blocking() guarantee that only one calling thread
+ *  will have any given mq returned at a time?
+ *  it seems that this is returning the same mq to many threads simultaneously
+ */
+#define N_PRE_HANDLER_THREADS 100
+#define N_HANDLER_THREADS 10
 
 void* repl_th(void* v_mq){
     struct mqueue* mq = v_mq;
@@ -117,6 +126,25 @@ void* beacon_th(void* v_ba){
         memcpy(nbp.ssid+UNAME_LEN+6, &variety, sizeof(unsigned int));
         insert_mqueue(ba->mq, &nbp, 1, 0);
         ++variety;
+        /* i've found that when this is set to 10 seconds,
+         * we don't see the same latency issues with rpi
+         * this indicates that our processing is still too slow
+         * this is a short term solution, because i expect heavy
+         * traffic on the network and would not like for this to
+         * introduce high latency
+         *
+         * TODO: we don't need a uname thread, uname notifications
+         * can be sent out only when a repl message is being sent
+         * and only if it's the first being sent in a while
+         * beacon messages have no use unless a repl message is coming
+         * soon after
+         * and there's no reason to clutter the air with beacon frames
+         * unneccessarily
+         *
+         * some experiments:
+         *  does latency increase with smaller sleep?
+         *  does getting rid of mid_magic checks improve performance?
+         */
         usleep(1000000);
     }
 }
@@ -407,14 +435,6 @@ if packet comes in that has a known length, memcpy into nbp and check if we know
 #endif
 
 _Bool is_viable_packet(struct an_directory* ad, unsigned char* buffer, struct new_beacon_packet* nbp, int len){
-    /* bounds i've experimentally found */
-    /*printf("len: %i, ret == %i\n", len, (len == 88 || len == 92 || len == 101 || len == 83));*/
-    /*return (len == 88 || len == 92 || len == 101 || len == 83);*/
-    /*if(!(len == 88 || len == 92 || len == 101 || len == 83))return 0;*/
-    /*ad = len->vpl_idx;*/
-    /*ad->viable_packet_len[*/
-    /*if(len != 92)return 0;*/
-    /*if(len < 80 || len > 180)return 0;*/
     int offset;
     if((offset = is_viable_plen(ad, len)) != -1){
         /* we shouldn't memcpy the entire size of an nbp because we're copying from after magic_hdr */
@@ -425,6 +445,7 @@ _Bool is_viable_packet(struct an_directory* ad, unsigned char* buffer, struct ne
         /* is packet is of known length but is not from a known user and is not a uname beacon,
          * ignore
          */
+        /*puts("dismissed packet outright");*/
         return 0;
     }
 
@@ -432,7 +453,15 @@ _Bool is_viable_packet(struct an_directory* ad, unsigned char* buffer, struct ne
      * if found, we add this packet length/offset pair
      * to our viable_packet_len storage
      */
-    for(int i = 0; i < len; ++i){
+/*
+ *     two experiments - add print statements to is_viable() does it truly run more often when we use more
+ *     pre-handler threads?
+ * 
+ *     does hard coding sizes have a huge speedup when both thinkpads are running
+*/
+
+    for(int i = ((char*)nbp->ssid-(char*)nbp); i < len; ++i){
+        /* this is an insane solution - just ignoring  */
         if(!memcmp(buffer+i, "/UNAME", 6)){
             /*
              * we have ssid, need to find src_addr
@@ -450,6 +479,7 @@ _Bool is_viable_packet(struct an_directory* ad, unsigned char* buffer, struct ne
             return 1;
         }
     }
+    /*puts("slowly ruled out packet");*/
     return 0;
 }
 
@@ -468,17 +498,25 @@ struct handler_arg{
  * checks if a packet is viable and adds it to cooked_mq
  * to be handled if it is
  */
+/* TODO: do pre_handler_th() and handler_th() guarantee that
+ * more work is done when more threads are running?
+ * is cpu time being wasted on lock operations?
+ *
+ * is is_viable_packet() called faster when N_PRE_HANDLER_THREADS > 10
+ */
+/* could insert_mqueue() too slow a bottleneck()
+ */
 void* pre_handler_th(void* v_ha){
     struct handler_arg* ha = v_ha;
 
     struct mq_entry* me;
-    struct new_beacon_packet* nbp, ref_nbp;
+    struct new_beacon_packet* nbp = NULL, ref_nbp;
 
     init_new_beacon_packet(&ref_nbp);
 
     while(1){
+        if(!nbp)nbp = malloc(sizeof(struct new_beacon_packet));
         me = pop_mqueue_blocking(ha->raw_mq);
-        nbp = malloc(sizeof(struct new_beacon_packet));
         /* at this point, me->packet is just an unsigned char* cast to nbp */
         /*len must be passed in a diff way - needs to be part of the mq/nbp*/
         /* 4 magic bytes are sometimes magically appended to our packets :shrug:
@@ -492,13 +530,12 @@ void* pre_handler_th(void* v_ha){
          * it's okay that we're limited to one byte because our upper bound for packet length
          * is 120 bytes and we can fit 0xff
          */
-        if(is_viable_packet(ha->ad, (unsigned char*)me->packet, nbp, (int)(*((unsigned char*)me->packet))) && 
+        if(is_viable_packet(ha->ad, (unsigned char*)me->packet, nbp, (int)(*((unsigned char*)me->packet))) &&
            (!memcmp(nbp->mid_magic, ref_nbp.mid_magic, sizeof(nbp->mid_magic)))){
 
                insert_mqueue(ha->cooked_mq, nbp, 0, 1);
+               nbp = NULL;
         }
-        /* if packet isn't viable, free up the mem */
-        else free(me->packet);
     }
 
     return NULL;

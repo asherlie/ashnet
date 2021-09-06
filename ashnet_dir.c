@@ -111,7 +111,7 @@ _Bool is_duplicate_packet(struct an_directory* ad, struct new_beacon_packet* nbp
 
     pthread_mutex_lock(&ad->packet_storage_locks[lock_idx]);
 
-    /*printf("checking %i stored packets\n", me->n_packets);*/
+    /*printf("checking %i stored packets for duplicates\n", me->n_packets);*/
     for(int i = 0; i < me->n_packets; ++i){
         if(!memcmp(me->nbp[i].src_addr, nbp->src_addr, sizeof(nbp->src_addr)) &&
            !memcmp(me->nbp[i].ssid, nbp->ssid, sizeof(nbp->ssid)) &&
@@ -146,6 +146,7 @@ void p_directory(struct an_directory* ad){
 }
 
 void add_viable_plen(struct an_directory* ad, int len, int offset){
+    /*printf("%i added as viable plen with offset %i\n", len, offset);*/
     atomic_store(ad->viable_packet_len+len, offset);
 }
 
