@@ -370,6 +370,9 @@ struct new_beacon_packet* handle_packet(struct new_beacon_packet* bp, struct an_
     /* after we've checked duplicates, in case of uname_beacon, we now insert_uname() and re-double src_addr */
     if(bp->uname_beacon){
         insert_uname(ad, bp->src_addr, (char*)bp->ssid+6);
+        /* the reason we must re-double and cannot rely on nbp_set_src_addr() is because nbp_set_src_addr()
+         * only handles setting of our local address, as of now there's no option to just double src_addr
+         */
         memcpy(&bp->end_transmission, bp->src_addr, 6);
     }
 
