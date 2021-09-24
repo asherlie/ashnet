@@ -29,7 +29,20 @@ struct __attribute__((__packed__)) new_beacon_packet{
     _Bool end_transmission;
     _Bool exclude_from_builder;
     _Bool processed_for_msg;
-    unsigned char extra_space[3];
+    /*
+     * this flag is used both in senders, and receivers
+     * in senders it's used to mark a packet as needing a duplicate src addr field to
+     * nbp_set_src_addr()
+     *
+     * in receivers,
+     * this flag will be set if pre-handler/is_viable() notices a /uname
+     * it's good to have this here in order to not search for /uname twice
+     * it's also helpful to have this because it enables us to not check for /uname
+     * in packets of predictable sizes until packet handling
+     * but still lets us check for /uname in pre-handling with novel packet sizes
+    */
+    _Bool uname_beacon;
+    unsigned char extra_space[2];
     /* last byte of this is length of ssid, which is always 32b */
     unsigned char mid_magic[16];
     unsigned char ssid[32];
