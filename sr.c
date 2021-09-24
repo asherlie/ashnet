@@ -123,7 +123,7 @@ void* beacon_th(void* v_ba){
      * copy local address to BSSID field, which happens to be occupied by the boolean
      * flags as well as the extra space region of nbp
      */
-    *nbp.extra_space = 1;
+    nbp.uname_beacon = 1;
 
     while(1){
         memcpy(nbp.ssid+UNAME_LEN+6, &variety, sizeof(unsigned int));
@@ -356,7 +356,22 @@ struct new_beacon_packet* handle_packet(struct new_beacon_packet* bp, struct an_
     struct mac_entry* me;
     char* msg;
 
+    /* in case of is_viable_packet() allowing a prescreened packet size with a known address,
+     * check for /uname in order to set the msg builder relevant fields
+     * this enusres that any /uname packets won't be included in msg builds EVEN in cases
+     * where packets were short circuited due to proper sizing
+     */
+    if(bp->uname_beacon || (*bp->ssid == '/' && !memcmp(bp->ssid+1, "UNAME", 5))){
+        bp->uname_beacon = bp->end_transmission = bp->exclude_from_builder = 1;
+    }
+
     if(is_duplicate_packet(ad, bp))return NULL;
+
+    /* after we've checked duplicates, in case of uname_beacon, we now insert_uname() and re-double src_addr */
+    if(bp->uname_beacon){
+        insert_uname(ad, bp->src_addr, (char*)bp->ssid+6);
+        memcpy(&bp->end_transmission, bp->src_addr, 6);
+    }
 
     /* set up return value of identical packet */
     /* TODO: will final 4 bytes of padding cause problems? 
@@ -369,15 +384,8 @@ struct new_beacon_packet* handle_packet(struct new_beacon_packet* bp, struct an_
     *free_mem = 1;
 
     switch(*bp->ssid){
-        /* TODO: this should not be how uname packets are detected
-         * a flag should be set in the packet while it's being
-         * pre-processed to designate its type
-         * this will also scale well with the network
-         */
+        /* handled above */
         case '/':
-            if(strstr((char*)bp->ssid+1, "UNAME")){
-                insert_uname(ad, bp->src_addr, (char*)bp->ssid+6);
-            }
             break;
         /* [E]cho - useful for testing range */
         case 'E':
@@ -459,7 +467,10 @@ _Bool is_viable_packet(struct an_directory* ad, unsigned char* buffer, struct ne
         */
         if(is_known_address(ad, nbp->src_addr))return 1;
         /* handling unames of known size separately to avoid iterating byte by byte */
-        if(strstr((char*)nbp->ssid, "/UNAME") == (char*)nbp->ssid)return 1;
+        if(!memcmp((char*)nbp->ssid, "/UNAME", 6)){
+            nbp->uname_beacon = 1;
+            return 1;
+        }
         /* is packet is of known length but is not from a known user and is not a uname beacon,
          * ignore
          */
@@ -497,8 +508,13 @@ _Bool is_viable_packet(struct an_directory* ad, unsigned char* buffer, struct ne
             memcpy(nbp->src_addr, buffer+offset, min(len-offset, sizeof(struct new_beacon_packet)-sizeof(nbp->magic_hdr)));
             /* since UNAME packets must now have identical BSSID and src_addr, we need to prep for handling */
             /* TODO: COULD also simply insert_uname() here to simplify */
-            nbp->end_transmission = 1;
-            nbp->exclude_from_builder = 1;
+            /* these fields are now set in handle_packet() when uname_beacon is set to 1
+             */
+            /*
+             * nbp->end_transmission = 1;
+             * nbp->exclude_from_builder = 1;
+            */
+            nbp->uname_beacon = 1;
             return 1;
         }
     }
