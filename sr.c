@@ -116,7 +116,10 @@ void* beacon_th(void* v_ba){
     // with the second identical address field in order to confirm structure
     // of packet
     //nbp.exclude_from_builder = 1;
-    /* this field is used in the pre-sending phase. this informs nbp_set_src_addr() to 
+    /* NOTE: new technique means that exclude_from_builder and end_transmission cannot
+     * be set before sending
+     * these are now set by the receiving node upon reception of a /uname packet
+     * this field is used in the pre-sending phase. this informs nbp_set_src_addr() to 
      * copy local address to BSSID field, which happens to be occupied by the boolean
      * flags as well as the extra space region of nbp
      */
@@ -366,6 +369,11 @@ struct new_beacon_packet* handle_packet(struct new_beacon_packet* bp, struct an_
     *free_mem = 1;
 
     switch(*bp->ssid){
+        /* TODO: this should not be how uname packets are detected
+         * a flag should be set in the packet while it's being
+         * pre-processed to designate its type
+         * this will also scale well with the network
+         */
         case '/':
             if(strstr((char*)bp->ssid+1, "UNAME")){
                 insert_uname(ad, bp->src_addr, (char*)bp->ssid+6);
@@ -439,6 +447,16 @@ _Bool is_viable_packet(struct an_directory* ad, unsigned char* buffer, struct ne
     if((offset = is_viable_plen(ad, len)) != -1){
         /* we shouldn't memcpy the entire size of an nbp because we're copying from after magic_hdr */
         memcpy(nbp->src_addr, buffer+offset, min(len-offset, sizeof(struct new_beacon_packet)-sizeof(nbp->magic_hdr)));
+        /*
+         * do we really need to set fields here?
+         * yes - we really should, though it seems not to be a problem
+         *
+         * nbp->end_transmission = 1;
+         * nbp->exclude_from_builder = 1;
+         *
+         * should this be added in case of /uname? or otherwise as well - investigate
+         * can't remember why i do this setting anyway tbh
+        */
         if(is_known_address(ad, nbp->src_addr))return 1;
         /* handling unames of known size separately to avoid iterating byte by byte */
         if(strstr((char*)nbp->ssid, "/UNAME") == (char*)nbp->ssid)return 1;
@@ -460,8 +478,13 @@ _Bool is_viable_packet(struct an_directory* ad, unsigned char* buffer, struct ne
  *     does hard coding sizes have a huge speedup when both thinkpads are running
 */
 
+    /* this section of the code is wildly inefficient and is likely the main bottleneck
+     * it's also the most frequent branch that's run upon reception of packets
+     * most packets in any given area are likely to just be noise of unrecognized packet size
+     * there's possibly no reason to search all of these for /uname, especially given that each
+     * message is sent OB
+     */
     for(int i = ((char*)nbp->ssid-(char*)nbp); i < len; ++i){
-        /* this is an insane solution - just ignoring  */
         if(!memcmp(buffer+i, "/UNAME", 6)){
             /*
              * we have ssid, need to find src_addr
