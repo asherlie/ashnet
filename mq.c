@@ -72,11 +72,12 @@ struct mq_entry* pop_mqueue_blocking(struct mqueue* mq){
             ret = mq->first;
             /*printf("ret!: %p\n", ret);*/
             mq->first = mq->first->next;
-            pthread_mutex_unlock(&mq->lock);
-            break;
+            /* if we're checking for !ret below, there's no need to break or unlock here */
+            /*pthread_mutex_unlock(&mq->lock);*/
+            /*break;*/
         }
         pthread_mutex_unlock(&mq->lock);
-        pthread_cond_wait(&mq->nonempty, &tmp_lck);
+        if(!ret)pthread_cond_wait(&mq->nonempty, &tmp_lck);
         pthread_mutex_unlock(&tmp_lck);
 
         #if 0
