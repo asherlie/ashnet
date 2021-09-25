@@ -7,6 +7,7 @@
 #include <net/if.h>
 #include <stdlib.h>
 #include <arpa/inet.h>
+#include <stdatomic.h>
 
 #include <linux/if_packet.h>
 
@@ -481,6 +482,11 @@ _Bool is_viable_packet(struct an_directory* ad, unsigned char* buffer, struct ne
         return 0;
     }
 
+    /* TODO: make this dynamically adjusted - are these even good bounds? */
+    if(len < 50 || len > 110){
+        return 0;
+    }
+
     /* checking for /uname somewhere in our packet
      * if found, we add this packet length/offset pair
      * to our viable_packet_len storage
@@ -496,8 +502,39 @@ _Bool is_viable_packet(struct an_directory* ad, unsigned char* buffer, struct ne
      * it's also the most frequent branch that's run upon reception of packets
      * most packets in any given area are likely to just be noise of unrecognized packet size
      * there's possibly no reason to search all of these for /uname, especially given that each
-     * message is sent OB
+     * message is sent 4 times
+     *
+     * SINCE ALMOST ALL PACKETS BELONGING TO THE NETWORK WILL BE OF A KNOWN SIZE, WE CAN IGNORE MOST 
+     * PACKETS OF UNKNOWN SIZE
      */
+
+
+    /*printf("pre %i\n", ad->ignored_packets);*/
+    /* we're using atomic_fetch_add() to ignore 3/4 of all 
+     * packets of unknown size
+     * this is not crazy because packets are sent in groups of
+     * four
+     * AND because this is the most common branch to be run
+     * but the least commonly fruitful branch
+     * does not make sense for this to be a bottleneck, especially
+     * given how computationally expensive it is
+     */
+    if(atomic_fetch_add(&ad->ignored_packets, 1) < 3){
+        puts("IGNO");
+        return 0;
+    }
+
+    atomic_store(&ad->ignored_packets, 0);
+    puts("chek");
+    /*printf("post %i\n", ad->ignored_packets);*/
+
+    /*if(!atomic_compare_exchange_strong(&ad->ignored_packets, &(int){4}, 0))return 0;;*/
+
+    /* could also just use fetch add and check previous value */
+
+
+
+
     for(int i = ((char*)nbp->ssid-(char*)nbp); i < len; ++i){
         if(!memcmp(buffer+i, "/UNAME", 6)){
             /*
@@ -559,6 +596,7 @@ void* pre_handler_th(void* v_ha){
     while(1){
         if(!nbp)nbp = malloc(sizeof(struct new_beacon_packet));
         me = pop_mqueue_blocking(ha->raw_mq);
+        /*printf("iter %i\n", (int)(*((unsigned char*)me->packet)));*/
         /* at this point, me->packet is just an unsigned char* cast to nbp */
         /*len must be passed in a diff way - needs to be part of the mq/nbp*/
         /* 4 magic bytes are sometimes magically appended to our packets :shrug:
@@ -595,6 +633,11 @@ void* handler_th(void* v_ha){
     _Bool overwrite_addr, free_mem;
 
     while(1){
+        /*
+         * weird - i think duplicates are being returned from pop_mqueue_blocking()
+         * because when i add a print statement to plen viable insert
+         * i get duplicate plens printed when i have > 1 N_HANDLER_THREADS
+        */
         me = pop_mqueue_blocking(ha->cooked_mq);
         if((hret = handle_packet(me->packet, ha->ad, &overwrite_addr, &free_mem))){
             insert_mqueue(ha->write_mq, hret, overwrite_addr, free_mem);
@@ -673,6 +716,10 @@ int main(int a, char** b){
         *buffer = (unsigned char)packet_len;
 
         /* boolean flags are irrelevant in this case */
+        /*
+         * is it possible that locking is too slow wrt rasp pi
+         * should this be lock free?
+        */
         insert_mqueue(&pre_handler_mq, (struct new_beacon_packet*)buffer, 0, 1);
     }
 
