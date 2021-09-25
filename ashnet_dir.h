@@ -14,6 +14,12 @@ struct mac_entry{
 };
 
 /* stores mac address, uname pairs */
+/* as of now, an_directory also stores
+ * the number of the number of ignored
+ * packets of unknown size that have been
+ * received in order to know when to accept
+ * one
+ */
 struct an_directory{
     pthread_mutex_t lock;
 
@@ -33,6 +39,8 @@ struct an_directory{
      * all indices will be initialized to -1, an impossible value
      */
     _Atomic int viable_packet_len[1000];
+
+    _Atomic int ignored_packets;
 };
 
 void init_an_directory(struct an_directory* ad, int storage);

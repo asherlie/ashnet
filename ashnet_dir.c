@@ -9,6 +9,7 @@ void init_an_directory(struct an_directory* ad, int storage){
     ad->packet_storage = storage;
     pthread_mutex_init(&ad->lock, NULL);
     memset(ad->viable_packet_len, -1, sizeof(ad->viable_packet_len));
+    ad->ignored_packets = 0;
 }
 
 int sum_addr(unsigned char* addr){
