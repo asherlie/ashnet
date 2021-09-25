@@ -519,21 +519,12 @@ _Bool is_viable_packet(struct an_directory* ad, unsigned char* buffer, struct ne
      * does not make sense for this to be a bottleneck, especially
      * given how computationally expensive it is
      */
-    if(atomic_fetch_add(&ad->ignored_packets, 1) < 3){
-        puts("IGNO");
-        return 0;
-    }
+    /* TODO: if my code is correct, the following logic can be afa() == 3
+     * is my code correct?
+     */
+    if(atomic_fetch_add(&ad->ignored_packets, 1) < 3)return 0;
 
     atomic_store(&ad->ignored_packets, 0);
-    puts("chek");
-    /*printf("post %i\n", ad->ignored_packets);*/
-
-    /*if(!atomic_compare_exchange_strong(&ad->ignored_packets, &(int){4}, 0))return 0;;*/
-
-    /* could also just use fetch add and check previous value */
-
-
-
 
     for(int i = ((char*)nbp->ssid-(char*)nbp); i < len; ++i){
         if(!memcmp(buffer+i, "/UNAME", 6)){
