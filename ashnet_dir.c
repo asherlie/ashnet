@@ -8,6 +8,9 @@ void init_an_directory(struct an_directory* ad, int storage){
     memset(ad->buckets, 0, sizeof(ad->buckets));
     ad->packet_storage = storage;
     pthread_mutex_init(&ad->lock, NULL);
+    for(int i = 0; i < 50; ++i){
+        pthread_mutex_init(ad->packet_storage_locks+i, NULL);
+    }
     memset(ad->viable_packet_len, -1, sizeof(ad->viable_packet_len));
     ad->ignored_packets = 0;
 }
