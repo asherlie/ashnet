@@ -421,7 +421,7 @@ struct new_beacon_packet* handle_packet(struct new_beacon_packet* bp, struct an_
     return ret;
 }
 
-inline int min(int a, int b){
+int min(int a, int b){
     if(a < b)return a;
     return b;
 }
@@ -607,6 +607,8 @@ void* pre_handler_th(void* v_ha){
                insert_mqueue(ha->cooked_mq, nbp, 0, 1);
                nbp = NULL;
         }
+        else free(me->packet);
+        free(me);
     }
 
     return NULL;
@@ -689,6 +691,7 @@ int main(int a, char** b){
     pthread_create(&repl_pth, NULL, repl_th, &write_mq);
     pthread_create(&beacon_pth, NULL, beacon_th, &ba);
 
+    /* TODO: exit gracefully, join all threads */
     /* spawning pre_handler and handler threads */
     for(int i = 0; i < N_PRE_HANDLER_THREADS; ++i){
         pthread_create(pre_handler_pth+i, NULL, pre_handler_th, &ha);
